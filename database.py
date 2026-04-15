@@ -74,6 +74,11 @@ async def get_all_users() -> list[int]:
             rows = await cursor.fetchall()
             return [row[0] for row in rows]
 
+async def get_all_users_details() -> list[tuple]:
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute("SELECT id, name, username FROM users") as cursor:
+            return await cursor.fetchall()
+
 async def get_stats() -> dict:
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute("SELECT COUNT(*) FROM users") as c1:

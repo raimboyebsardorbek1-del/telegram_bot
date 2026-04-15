@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import admin_panel_kb, cancel_kb
 from config import ADMIN_PASSWORD
-from database import get_stats, ban_user, unban_user
+from database import get_stats, ban_user, unban_user, get_all_users_details
 from services.broadcast_service import broadcast_message
 # Using straightforward plaintext comparison for this scale,
 # or hashed comparison if you decide to hash passwords in utils.py.
@@ -61,6 +61,33 @@ async def show_stats(callback: CallbackQuery, state: FSMContext):
         f"🚫 Ban qilinganlar: {stats['banned']}"
     )
     await callback.message.answer(text)
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_users_list")
+async def show_users_list(callback: CallbackQuery, state: FSMContext):
+    curr_state = await state.get_state()
+    if curr_state != AdminState.is_admin.state:
+        await callback.answer("Ruxsatsiz!", show_alert=True)
+        return
+
+    users = await get_all_users_details()
+    if not users:
+        await callback.message.answer("Foydalanuvchilar mavjud emas.")
+        await callback.answer()
+        return
+
+    text = "👥 Foydalanuvchilar ro'yxati:\n\n"
+    for user_id, name, username in users:
+        username_str = f"@{username}" if username else "Username yo'q"
+        text += f"🆔 {user_id} - {username_str} ({name})\n"
+        
+        # Checking message limit
+        if len(text) > 3900:
+            await callback.message.answer(text)
+            text = "" # Reset for next part if needed
+            
+    if text:
+        await callback.message.answer(text)
     await callback.answer()
 
 @router.callback_query(F.data == "admin_broadcast")

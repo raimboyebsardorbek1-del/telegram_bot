@@ -33,6 +33,7 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="📊 Statistika", callback_data="admin_stats")],
             [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin_broadcast")],
+            [InlineKeyboardButton(text="👥 Foydalanuvchilar ro'yxati", callback_data="admin_users_list")],
             [InlineKeyboardButton(text="🚫 Ban user", callback_data="admin_ban")],
             [InlineKeyboardButton(text="✅ Unban user", callback_data="admin_unban")]
         ]
