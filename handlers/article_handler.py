@@ -25,7 +25,7 @@ async def process_topic(message: Message, state: FSMContext):
     await state.update_data(topic=message.text)
     await state.set_state(ArticleState.waiting_for_pages)
     await message.answer(
-        "Maqola necha bet bo'lishi kerak? (Masalan: 3 bet):",
+        "Maqola necha bet bo'lishi kerak? (Masalan: 3-5 bet):",
         reply_markup=cancel_kb()
     )
 

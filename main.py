@@ -2,6 +2,8 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiohttp import web
+import os
 
 # configurations & initialization
 from config import BOT_TOKEN
@@ -18,6 +20,9 @@ from handlers import (
     ai_chat_handler,
     admin_handler
 )
+
+async def handle(request):
+    return web.Response(text="Bot is running!")
 
 async def main():
     # Setup basic logging
@@ -44,8 +49,18 @@ async def main():
     dp.include_router(ai_chat_handler.router)
     dp.include_router(admin_handler.router)
 
-    # Start polling safely
+    # Start simple web server for Render health check
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    
     try:
+        logging.info(f"Starting web server on port {port}...")
+        await site.start()
+        
         logging.info("Bot is starting...")
         # Drop previous updates to avoid processing stale messages
         await bot.delete_webhook(drop_pending_updates=True)
