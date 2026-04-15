@@ -23,10 +23,6 @@ async def cmd_start(message: Message, state: FSMContext):
         f"Assalomu alaykum, {message.from_user.first_name}!\n\n"
         "Men sizning shaxsiy AI yordamchigizman. Quyidagi menudan kerakli bo'limni tanlang:"
     )
-    
-    # Eskidan qolib ketgan ReplyKeyboardButton'larni o'chirish uchun
-    await message.answer("Eski menyu tozalanmoqda...", reply_markup=ReplyKeyboardRemove())
-    # Yangi Inline menyuni yuborish
     await message.answer(text, reply_markup=main_menu_kb())
 
 @router.callback_query(F.data == "cancel")
