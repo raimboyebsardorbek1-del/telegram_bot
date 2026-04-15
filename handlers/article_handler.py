@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import article_language_kb, cancel_kb, main_menu_kb
 from services.ai_service import generate_article
+from utils import send_split_message
 
 router = Router()
 
@@ -51,7 +52,7 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
     
     try:
         article = await generate_article(topic, pages, language)
-        await callback.message.answer(article)
+        await send_split_message(callback.message, article)
     except Exception as e:
         await callback.message.answer(f"❌ Kechirasiz, maqola tayyorlashda xatolik yuz berdi: {e}")
     

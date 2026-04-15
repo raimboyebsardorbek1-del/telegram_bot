@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import cancel_kb, main_menu_kb
 from services.ai_service import chat_with_gemini
+from utils import send_split_message
 
 router = Router()
 
@@ -28,6 +29,6 @@ async def process_ai_message(message: Message):
     try:
         response = await chat_with_gemini(message.from_user.id, message.text)
         await wait_msg.delete()
-        await message.answer(response)
+        await send_split_message(message, response)
     except Exception as e:
         await wait_msg.edit_text(f"❌ Kechirasiz, xatolik yuz berdi: {e}")

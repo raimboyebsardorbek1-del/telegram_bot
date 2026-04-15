@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import assignment_difficulty_kb, cancel_kb, main_menu_kb
 from services.ai_service import generate_assignment
+from utils import send_split_message
 
 router = Router()
 
@@ -51,7 +52,7 @@ async def process_difficulty(callback: CallbackQuery, state: FSMContext):
     
     try:
         assignment_response = await generate_assignment(subject, pages, difficulty)
-        await callback.message.answer(assignment_response)
+        await send_split_message(callback.message, assignment_response)
     except Exception as e:
         await callback.message.answer(f"❌ Kechirasiz, topshiriq tayyorlashda xatolik yuz berdi: {e}")
     
