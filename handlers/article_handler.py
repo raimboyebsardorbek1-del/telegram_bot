@@ -9,7 +9,7 @@ from utils import send_split_message, create_docx
 router = Router()
 
 class ArticleState(StatesGroup):
-    """Maqola yaratish jarayoni uchun holatlar (FSM)."""
+    """FSM States for the article creation process."""
     waiting_for_topic = State()
     waiting_for_university = State()
     waiting_for_author = State()
@@ -18,7 +18,7 @@ class ArticleState(StatesGroup):
 
 @router.callback_query(F.data == "menu_article")
 async def start_article(callback: CallbackQuery, state: FSMContext):
-    """Maqola yozish jarayonini boshlaydi."""
+    """Starts the article writing process."""
     await state.set_state(ArticleState.waiting_for_topic)
     await callback.message.edit_text(
         "Maqola mavzusini kiriting:",

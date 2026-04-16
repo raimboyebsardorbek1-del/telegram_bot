@@ -15,12 +15,12 @@ from docx.shared import Pt
 request_cache = TTLCache(maxsize=10000, ttl=1.0)
 
 def hash_password(password: str) -> str:
-    """Berilgan parolni SHA-256 formatida kodlaydi."""
+    """Hashes the given password using SHA-256."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 async def send_split_message(message: Message, text: str):
-    """Uzun xabarni bo'laklarga bo'lib ketma-ket yuboradi."""
-    limit = 4000  # Telegram limiti 4096, xavfsizlik uchun 4000 dan foydalanamiz
+    """Sends a long message by splitting it into smaller chunks."""
+    limit = 4000  # Telegram limit is 4096, using 4000 for safety
     if len(text) <= limit:
         await message.answer(text)
     else:
@@ -29,8 +29,8 @@ async def send_split_message(message: Message, text: str):
             await message.answer(chunk)
 
 def clean_markdown(text: str) -> str:
-    """Markdown formatidagi belgilarni (###, **, _) olib tashlaydi."""
-    # Qalin/Kursiv yulduzchalarini olib tashlash
+    """Cleans markdown symbols (###, **, _) from the generated text."""
+    # Remove bold/italic asterisks
     text = re.sub(r'\*+', '', text)
     # Sarlavha heshteglarini olib tashlash (###, #### va hk)
     text = re.sub(r'#+\s*', '', text)
@@ -41,7 +41,7 @@ def clean_markdown(text: str) -> str:
     return text.strip()
 
 def cleanup_old_files():
-    """Exports direktoriyasidan 24 soatdan eski bo'lgan fayllarni o'chiradi."""
+    """Removes files older than 24 hours from the exports directory."""
     exports_dir = "exports"
     if not os.path.exists(exports_dir):
         return
@@ -58,7 +58,7 @@ def cleanup_old_files():
                     pass
 
 def create_docx(text: str, filename: str, university: str, author: str, topic: str, doc_type: str) -> str:
-    """Titul varag'i, Reja va Asosiy qismdan iborat .docx fayl yaratadi."""
+    """Creates a .docx file with a cover page, outline, and main content."""
     exports_dir = "exports"
     if not os.path.exists(exports_dir):
         os.makedirs(exports_dir)

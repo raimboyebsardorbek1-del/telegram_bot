@@ -10,8 +10,8 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 async def generate_article(topic: str, pages: str, language: str) -> str:
-    """Mavzu va til talablariga asoslanib maqola generatsiya qiladi."""
-    # Betlar soniga qarab so'zlar miqdorini hisoblaymiz: ~300 so'z 1 bet uchun (Pt 14, 1.5 spacing)
+    """Generates an article based on the topic and language requirements."""
+    # Calculate word count based on pages: ~300 words per page (Pt 14, 1.5 spacing)
     match = re.search(r'(\d+)', str(pages))
     num_pages = int(match.group(1)) if match else 2
     word_target = num_pages * 300
@@ -32,8 +32,8 @@ async def generate_article(topic: str, pages: str, language: str) -> str:
         return f"Xatolik yuz berdi. Iltimos keyinroq qayta urunib ko'ring. (Xato: {e})"
 
 async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
-    """Mustaqil ish va uning yechimini generatsiya qiladi."""
-    # So'zlar miqdorini hisoblaymiz
+    """Generates an independent work assignment and its solution."""
+    # Calculate word count target
     match = re.search(r'(\d+)', str(pages))
     num_pages = int(match.group(1)) if match else 3
     word_target = num_pages * 300
@@ -54,8 +54,8 @@ async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
         return f"Xatolik yuz berdi. Iltimos keyinroq qayta urunib ko'ring. (Xato: {e})"
 
 async def chat_with_gemini(user_id: int, message: str) -> str:
-    """Gemini bilan muloqot qiladi va foydalanuvchi tarixini DB dan oladi."""
-    # Oxirgi tarixdagi xabarlarni DB dan olamiz
+    """Interacts with Gemini and logs history."""
+    # Get last messages history from DB
     history = await get_user_chat_history(user_id, limit=7)
     
     chat_history = []

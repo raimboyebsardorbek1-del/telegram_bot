@@ -9,8 +9,8 @@ router = Router()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    """Start (Boshlash) buyrug'ini qabul qiladi va asosiy menyuni yuboradi."""
-    # FSM holatini tozalash, agar foydalanuvchi boshqa jarayonda bo'lsa
+    """Handles the /start command and sends the main menu."""
+    # Clear FSM state if user was in another process
     await state.clear()
     
     # Bazaga qo'shish
@@ -28,13 +28,13 @@ async def cmd_start(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "cancel")
 async def cancel_action(callback: CallbackQuery, state: FSMContext):
-    """Joriy amalni bekor qiladi va asosiy menyuga qaytaradi."""
+    """Cancels the current action and returns to the main menu."""
     await state.clear()
     await callback.message.edit_text("Amal bekor qilindi.\n\nAsosiy menyu:", reply_markup=main_menu_kb())
 
 @router.callback_query(F.data == "menu_contact")
 async def contact_handler(callback: CallbackQuery):
-    """Aloqa bo'limi ma'lumotlarini ko'rsatadi."""
+    """Shows contact information and support."""
     await callback.message.edit_text(
         "📞 Markaziy aloqa bo'limi:\n\n"
         "Admin: +998772243435\n"

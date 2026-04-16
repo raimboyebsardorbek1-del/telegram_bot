@@ -14,7 +14,7 @@ from utils import hash_password
 router = Router()
 
 class AdminState(StatesGroup):
-    """Admin paneli uchun holatlar (FSM)."""
+    """States for the admin panel process (FSM)."""
     waiting_for_password = State()
     waiting_for_broadcast = State()
     waiting_for_ban = State()
@@ -22,7 +22,7 @@ class AdminState(StatesGroup):
     is_admin = State()
 
 def verify_pwd(pwd: str) -> bool:
-    """Parolni tekshiradi. Hozircha oddiy matn ko'rinishida solishtiradi."""
+    """Verifies the password. Currently compares as plaintext."""
     return pwd == ADMIN_PASSWORD
 
 @router.message(Command("admin"))
@@ -32,7 +32,7 @@ async def start_admin(message: Message, state: FSMContext):
 
 @router.message(AdminState.waiting_for_password)
 async def process_admin_password(message: Message, state: FSMContext):
-    """Kiritilgan parolni tekshiradi va adminga ruxsat beradi."""
+    """Processes the admin password and yields access."""
     if verify_pwd(message.text):
         await message.answer("✅ Admin paneliga xush kelibsiz!", reply_markup=admin_panel_kb())
         await state.set_state(AdminState.is_admin)
