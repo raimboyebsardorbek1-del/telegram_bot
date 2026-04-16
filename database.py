@@ -35,7 +35,7 @@ async def init_db():
             )
         ''')
         await db.commit()
-        logging.info("Database initialized with structured tables.")
+        logging.info("Ma'lumotlar bazasi jadvallar bilan initsializatsiya qilindi.")
 
 async def add_user(user_id: int, name: str, username: str):
     async with aiosqlite.connect(DB_NAME) as db:
@@ -96,5 +96,5 @@ async def get_user_chat_history(user_id: int, limit: int = 5) -> list[tuple]:
             (user_id, limit)
         ) as cursor:
             rows = await cursor.fetchall()
-            # Reverse to give chronological order
+            # Xronologik tartibni ta'minlash uchun teskari aylantiramiz
             return rows[::-1]

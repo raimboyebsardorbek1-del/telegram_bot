@@ -9,17 +9,19 @@ from utils import send_split_message, create_docx
 router = Router()
 
 class AssignmentState(StatesGroup):
+    """Mustaqil ish yaratish jarayoni uchun holatlar (FSM)."""
     waiting_for_subject = State()
     waiting_for_university = State()
     waiting_for_author = State()
     waiting_for_pages = State()
     waiting_for_difficulty = State()
 
-@router.callback_query(F.data == "menu_assignment")
-async def start_assignment_flow(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == "independent_work")
+async def start_assignment(callback: CallbackQuery, state: FSMContext):
+    """Mustaqil ish jarayonini boshlaydi."""
     await state.set_state(AssignmentState.waiting_for_subject)
     await callback.message.edit_text(
-        "📝 Mustaqil ish uchun fanni (yoki mavzuni) kiriting:",
+        "Mavzuni (fanni) kiriting:",
         reply_markup=cancel_kb()
     )
 

@@ -3,16 +3,15 @@ import re
 from config import GEMINI_API_KEY
 from database import log_ai_history, get_user_chat_history
 
-# Configure the Gemini API with the initialized key
+# Gemini API ni kalit bilan sozlash
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Using flash model for best performance and cost
-# Using flash model for better quota and performance
-model = genai.GenerativeModel('gemini-flash-latest')
+# Yaxshi ishlashi va arzonligi uchun flash modelidan foydalanamiz
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 async def generate_article(topic: str, pages: str, language: str) -> str:
-    """Generates an article using Gemini based on topic and language requirements."""
-    # Calculate target words: ~300 words per page (for Pt 14, 1.5 spacing)
+    """Mavzu va til talablariga asoslanib maqola generatsiya qiladi."""
+    # Betlar soniga qarab so'zlar miqdorini hisoblaymiz: ~300 so'z 1 bet uchun (Pt 14, 1.5 spacing)
     match = re.search(r'(\d+)', str(pages))
     num_pages = int(match.group(1)) if match else 2
     word_target = num_pages * 300
@@ -33,8 +32,8 @@ async def generate_article(topic: str, pages: str, language: str) -> str:
         return f"Xatolik yuz berdi. Iltimos keyinroq qayta urunib ko'ring. (Xato: {e})"
 
 async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
-    """Generates an assignment and solution."""
-    # Calculate target words
+    """Mustaqil ish va uning yechimini generatsiya qiladi."""
+    # So'zlar miqdorini hisoblaymiz
     match = re.search(r'(\d+)', str(pages))
     num_pages = int(match.group(1)) if match else 3
     word_target = num_pages * 300
@@ -55,8 +54,8 @@ async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
         return f"Xatolik yuz berdi. Iltimos keyinroq qayta urunib ko'ring. (Xato: {e})"
 
 async def chat_with_gemini(user_id: int, message: str) -> str:
-    """Chats with Gemini, maintaining a short history per user from DB."""
-    # Fetch recent history (chronological) from db
+    """Gemini bilan muloqot qiladi va foydalanuvchi tarixini DB dan oladi."""
+    # Oxirgi tarixdagi xabarlarni DB dan olamiz
     history = await get_user_chat_history(user_id, limit=7)
     
     chat_history = []
@@ -67,7 +66,7 @@ async def chat_with_gemini(user_id: int, message: str) -> str:
     try:
         chat = model.start_chat(history=chat_history)
         response = await chat.send_message_async(message)
-        # Log response mapped to user
+        # Tarixni DB ga yozamiz
         await log_ai_history(user_id, message, response.text)
         return response.text
     except Exception as e:

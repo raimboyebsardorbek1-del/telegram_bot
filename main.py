@@ -5,14 +5,14 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 import os
 
-# configurations & initialization
+# konfiguratsiya va initsializatsiya
 from config import BOT_TOKEN
 from database import init_db
 
-# middlewares
+# middlewarelar
 from utils import ThrottlingMiddleware, BannedUserMiddleware
 
-# handlers
+# handlerlar (boshqaruvchilar)
 from handlers import (
     user_handlers,
     article_handler,
@@ -25,31 +25,31 @@ async def handle(request):
     return web.Response(text="Bot is running!")
 
 async def main():
-    # Setup basic logging
+    # Asosiy loggingni sozlash
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
     )
     
-    # Initialize the database asynchronously
+    # Ma'lumotlar bazasini asinxron ishga tushirish
     await init_db()
 
-    # Initialize bot and dispatchers
+    # Bot va dispetcherni initsializatsiya qilish
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Middleware registration (Anti-spam / Throttling)
+    # Middlewarelarni ro'yxatga olish (Anti-spam / Throttling)
     dp.message.middleware(ThrottlingMiddleware())
     dp.message.middleware(BannedUserMiddleware())
 
-    # Register routers (order is somewhat important but generally handled by filters)
+    # Routerni (yo'naltiruvchi) ro'yxatga olish
     dp.include_router(user_handlers.router)
     dp.include_router(article_handler.router)
     dp.include_router(assignment_handler.router)
     dp.include_router(ai_chat_handler.router)
     dp.include_router(admin_handler.router)
 
-    # Start simple web server for Render health check
+    # Render health check uchun oddiy veb-serverni ishga tushirish
     app = web.Application()
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
@@ -58,11 +58,11 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", port)
     
     try:
-        logging.info(f"Starting web server on port {port}...")
+        logging.info(f"Veb-server {port} portida ishga tushirilmoqda...")
         await site.start()
         
-        logging.info("Bot is starting...")
-        # Drop previous updates to avoid processing stale messages
+        logging.info("Bot ishga tushmoqda...")
+        # Eski xabarlarni qayta ishlamaslik uchun webhookni o'chirib tozalaymiz
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
