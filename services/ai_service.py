@@ -2,16 +2,37 @@ import google.generativeai as genai
 import re
 from config import GEMINI_API_KEY
 from database import log_ai_history, get_user_chat_history
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # Gemini API ni kalit bilan sozlash
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Yaxshi ishlashi va arzonligi uchun flash modelidan foydalanamiz
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Global safety settings to minimize content blocking
+SAFETY_SETTINGS = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
+
+# Generation config for longer outputs
+GENERATION_CONFIG = {
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "top_k": 40,
+    "max_output_tokens": 8192,
+}
+
+# Use flash model for performance and lower cost
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    generation_config=GENERATION_CONFIG,
+    safety_settings=SAFETY_SETTINGS
+)
 
 async def generate_article(topic: str, pages: str, language: str) -> str:
     """Generates an article based on the topic and language requirements."""
-    # Calculate word count based on pages: ~300 words per page (Pt 14, 1.5 spacing)
+    # Calculate word count based on pages
     match = re.search(r'(\d+)', str(pages))
     num_pages = int(match.group(1)) if match else 2
     word_target = num_pages * 300
@@ -19,13 +40,20 @@ async def generate_article(topic: str, pages: str, language: str) -> str:
     prompt = (
         f"Write an article about '{topic}' in {language} language. "
         f"The content MUST be at least {word_target} words long to fill exactly {num_pages} pages. "
-        f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
-        f"Following the REJA section, provide the full content structured into: "
-        f"Kirish (Introduction), Asosiy qism (Main part), and Xulosa (Conclusion)."
+        f"Structure MUST start with a section titled 'REJA:' which lists the main points. "
+        f"Following the REJA section, provide the full content: Kirish, Asosiy qism, and Xulosa."
     )
     try:
         response = await model.generate_content_async(prompt)
+        # Check if the response was blocked
+        if not response.text:
+            return "Kechirasiz, ushbu mavzu bo'yicha ma'lumot generatsiya qilishni AI havfsizlik filtri blokladi."
         return response.text
+    except ValueError as ve:
+        # ValueError is often raised when response.text is accessed but it's empty/blocked
+        import logging
+        logging.warning(f"Content blocked or empty: {ve}")
+        return "Kechirasiz, mavzu havfsizlik filtrlari tomonidan bloklandi yoki AI javob bera olmadi."
     except Exception as e:
         import logging
         logging.error(f"Error in generate_article: {e}")
@@ -33,25 +61,26 @@ async def generate_article(topic: str, pages: str, language: str) -> str:
 
 async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
     """Generates an independent work assignment and its solution."""
-    # Calculate word count target
     match = re.search(r'(\d+)', str(pages))
     num_pages = int(match.group(1)) if match else 3
     word_target = num_pages * 300
 
     prompt = (
-        f"Create an independent work assignment (mustaqil ish) about the subject '{subject}' "
-        f"with '{difficulty}' difficulty level. The content MUST be at least {word_target} words long to fill exactly {num_pages} pages. "
-        f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
-        f"Following the REJA section, provide the complete solution/content. "
-        f"The entire response must be in Uzbek."
+        f"Create an independent work assignment (mustaqil ish) about '{subject}' "
+        f"with '{difficulty}' difficulty. At least {word_target} words long for {num_pages} pages. "
+        f"Start with 'REJA:', then provide the complete solution in Uzbek."
     )
     try:
         response = await model.generate_content_async(prompt)
+        if not response.text:
+            return "Kechirasiz, ushbu mavzu bo'yicha ma'lumot bloklandi."
         return response.text
+    except ValueError:
+        return "Kechirasiz, mavzu AI filtrlariga to'g'ri kelmadi."
     except Exception as e:
         import logging
         logging.error(f"Error in generate_assignment: {e}")
-        return f"Xatolik yuz berdi. Iltimos keyinroq qayta urunib ko'ring. (Xato: {e})"
+        return f"Xatolik yuz berdi. (Xato: {e})"
 
 async def chat_with_gemini(user_id: int, message: str) -> str:
     """Interacts with Gemini and logs history."""
