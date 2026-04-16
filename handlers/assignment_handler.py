@@ -74,7 +74,6 @@ async def process_difficulty(callback: CallbackQuery, state: FSMContext):
     
     try:
         assignment_response = await generate_assignment(subject, pages, difficulty)
-        await send_split_message(callback.message, assignment_response)
         
         # Word faylni yaratish va yuborish
         file_path = create_docx(assignment_response, f"Mustaqil_ish_{callback.from_user.id}.docx", university, author, subject, "MUSTAQIL ISH")

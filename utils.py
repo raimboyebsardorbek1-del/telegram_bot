@@ -5,6 +5,7 @@ from typing import Callable, Dict, Any, Awaitable
 from cachetools import TTLCache
 import os
 import time
+import re
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
@@ -26,6 +27,18 @@ async def send_split_message(message: Message, text: str):
         for i in range(0, len(text), limit):
             chunk = text[i:i + limit]
             await message.answer(chunk)
+
+def clean_markdown(text: str) -> str:
+    """Removes common markdown-style formatting symbols."""
+    # Remove Bold/Italic stars
+    text = re.sub(r'\*+', '', text)
+    # Remove Hashtags headings (###, ####, etc.)
+    text = re.sub(r'#+\s*', '', text)
+    # Remove Underscores
+    text = re.sub(r'_+', '', text)
+    # Remove horizontal lines represented by dashes
+    text = re.sub(r'-{3,}', '', text)
+    return text.strip()
 
 def cleanup_old_files():
     """Deletes files older than 24 hours from the exports directory."""
@@ -55,86 +68,100 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     doc = Document()
     
     # --- PAGE 1: COVER ---
-    # Ministry Name
-    p1 = doc.add_paragraph("O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM FAN VA INNOVATSIYA VAZIRLIGI")
-    p1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p1.runs[0].bold = True
-    p1.runs[0].font.size = Pt(12)
-    
-    # University Name
-    p2 = doc.add_paragraph(university.upper())
-    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p2.runs[0].bold = True
-    p2.runs[0].font.size = Pt(14)
+    # Combined Ministry and University Name
+    uni_text = f"O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM FAN VA INNOVATSIYA VAZIRLIGI\n{university.upper()}"
+    p_header = doc.add_paragraph()
+    p_header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_header = p_header.add_run(uni_text)
+    run_header.bold = True
+    run_header.font.size = Pt(18)
     
     # Large Space
-    for _ in range(5): doc.add_paragraph("")
+    for _ in range(6): doc.add_paragraph("")
     
     # Document Type (MUSTAQIL ISH / MAQOLA)
-    p3 = doc.add_paragraph(doc_type.upper())
+    p3 = doc.add_paragraph()
     p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p3.runs[0].bold = True
-    p3.runs[0].font.size = Pt(36)
+    run3 = p3.add_run(doc_type.upper())
+    run3.bold = True
+    run3.font.size = Pt(36)
     
     doc.add_paragraph("")
     
     # Topic
-    p4 = doc.add_paragraph(topic.upper())
+    p4 = doc.add_paragraph()
     p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p4.runs[0].bold = True
-    p4.runs[0].font.size = Pt(16)
+    run4 = p4.add_run(topic.upper())
+    run4.bold = True
+    run4.font.size = Pt(16)
     
     # Space before author
-    for _ in range(3): doc.add_paragraph("")
+    for _ in range(4): doc.add_paragraph("")
     
     # Author Info
-    p5 = doc.add_paragraph(f"Bajardi: {author}")
+    p5 = doc.add_paragraph()
     p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p5.runs[0].font.size = Pt(14)
+    run5 = p5.add_run(f"Bajardi: {author}")
+    run5.font.size = Pt(14)
     
-    # Push Year to bottom (approximate)
-    for _ in range(5): doc.add_paragraph("")
+    # Push Year to bottom
+    for _ in range(6): doc.add_paragraph("")
     
-    p6 = doc.add_paragraph("2025-2026 O'quv Yili")
+    p6 = doc.add_paragraph()
     p6.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p6.runs[0].font.size = Pt(12)
+    run6 = p6.add_run("2025-2026 O'quv Yili")
+    run6.font.size = Pt(12)
     
     doc.add_page_break()
     
     # --- PAGE 2: OUTLINE (REJA) ---
-    # Try to extract REJA section from AI text
     content_parts = text.split("REJA:", 1)
     if len(content_parts) > 1:
-        # Check if there is a header after REJA to stop at
-        parts = content_parts[1].split("\n\n", 1)  # Usually REJA is followed by double newline
+        parts = content_parts[1].split("\n\n", 1)
         reja_text = parts[0].strip()
         actual_content = parts[1].strip() if len(parts) > 1 else ""
     else:
         reja_text = ""
         actual_content = text
         
-    p_reja_title = doc.add_paragraph("REJA")
+    p_reja_title = doc.add_paragraph()
     p_reja_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_reja_title.runs[0].bold = True
-    p_reja_title.runs[0].font.size = Pt(16)
+    run_reja = p_reja_title.add_run("REJA")
+    run_reja.bold = True
+    run_reja.font.size = Pt(16)
     
     doc.add_paragraph("")
     
     if reja_text:
+        # Clean reja before adding
         for line in reja_text.split("\n"):
             if line.strip():
-                # Clean up prefix like "1. ", "- " if AI added them
-                doc.add_paragraph(line.strip())
+                p_r = doc.add_paragraph()
+                run_r = p_r.add_run(clean_markdown(line))
+                run_r.font.size = Pt(14)
     else:
-        doc.add_paragraph("Ma'lumot topilmadi.")
+        doc.add_paragraph("Ma'lumot topilmadi.").runs[0].font.size = Pt(14)
         
     doc.add_page_break()
     
     # --- PAGE 3+: CONTENT ---
-    for line in actual_content.split('\n'):
-        p = doc.add_paragraph(line)
-        if line.isupper() or "**" in line: # Simple header detection
-            p.runs[0].bold = True
+    # Split content by double newlines or similar to detect paragraph breaks
+    paragraphs = actual_content.split('\n')
+    for line in paragraphs:
+        if not line.strip():
+            continue
+            
+        p = doc.add_paragraph()
+        cleaned_line = clean_markdown(line)
+        run = p.add_run(cleaned_line)
+        run.font.size = Pt(14)
+        
+        # Simple bold check for headers (if entire line was uppercase in original)
+        if line.isupper() or line.strip().startswith('###'):
+            run.bold = True
+            
+        # Add space between paragraphs as requested
+        doc.add_paragraph("")
             
     file_path = os.path.abspath(os.path.join(exports_dir, filename))
     doc.save(file_path)

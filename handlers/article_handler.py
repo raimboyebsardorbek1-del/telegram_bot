@@ -74,7 +74,6 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
     
     try:
         article = await generate_article(topic, pages, language)
-        await send_split_message(callback.message, article)
         
         # Word faylni yaratish va yuborish
         file_path = create_docx(article, f"Maqola_{callback.from_user.id}.docx", university, author, topic, "MAQOLA")
