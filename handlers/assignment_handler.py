@@ -16,7 +16,7 @@ class AssignmentState(StatesGroup):
     waiting_for_pages = State()
     waiting_for_difficulty = State()
 
-@router.callback_query(F.data == "independent_work")
+@router.callback_query(F.data == "menu_assignment")
 async def start_assignment(callback: CallbackQuery, state: FSMContext):
     """Mustaqil ish jarayonini boshlaydi."""
     await state.set_state(AssignmentState.waiting_for_subject)

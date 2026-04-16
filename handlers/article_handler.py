@@ -16,7 +16,7 @@ class ArticleState(StatesGroup):
     waiting_for_pages = State()
     waiting_for_language = State()
 
-@router.callback_query(F.data == "write_article")
+@router.callback_query(F.data == "menu_article")
 async def start_article(callback: CallbackQuery, state: FSMContext):
     """Maqola yozish jarayonini boshlaydi."""
     await state.set_state(ArticleState.waiting_for_topic)
