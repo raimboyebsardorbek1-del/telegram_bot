@@ -1,4 +1,5 @@
 import google.generativeai as genai
+import re
 from config import GEMINI_API_KEY
 from database import log_ai_history, get_user_chat_history
 
@@ -11,9 +12,14 @@ model = genai.GenerativeModel('gemini-flash-latest')
 
 async def generate_article(topic: str, pages: str, language: str) -> str:
     """Generates an article using Gemini based on topic and language requirements."""
+    # Calculate target words: ~300 words per page (for Pt 14, 1.5 spacing)
+    match = re.search(r'(\d+)', str(pages))
+    num_pages = int(match.group(1)) if match else 2
+    word_target = num_pages * 300
+
     prompt = (
         f"Write an article about '{topic}' in {language} language. "
-        f"The article should be approximately {pages} pages long. "
+        f"The content MUST be at least {word_target} words long to fill exactly {num_pages} pages. "
         f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
         f"Following the REJA section, provide the full content structured into: "
         f"Kirish (Introduction), Asosiy qism (Main part), and Xulosa (Conclusion)."
@@ -28,10 +34,14 @@ async def generate_article(topic: str, pages: str, language: str) -> str:
 
 async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
     """Generates an assignment and solution."""
+    # Calculate target words
+    match = re.search(r'(\d+)', str(pages))
+    num_pages = int(match.group(1)) if match else 3
+    word_target = num_pages * 300
+
     prompt = (
         f"Create an independent work assignment (mustaqil ish) about the subject '{subject}' "
-        f"with '{difficulty}' difficulty level. The target length should be "
-        f"approximately {pages} pages. "
+        f"with '{difficulty}' difficulty level. The content MUST be at least {word_target} words long to fill exactly {num_pages} pages. "
         f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
         f"Following the REJA section, provide the complete solution/content. "
         f"The entire response must be in Uzbek."

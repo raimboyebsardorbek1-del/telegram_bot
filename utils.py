@@ -152,6 +152,9 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
             continue
             
         p = doc.add_paragraph()
+        # Set 1.5 lines spacing
+        p.paragraph_format.line_spacing = 1.5
+        
         cleaned_line = clean_markdown(line)
         run = p.add_run(cleaned_line)
         run.font.size = Pt(14)
@@ -161,7 +164,9 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
             run.bold = True
             
         # Add space between paragraphs as requested
-        doc.add_paragraph("")
+        # We also set 1.5 spacing for these empty paragraphs to maintain consistency
+        empty_p = doc.add_paragraph("")
+        empty_p.paragraph_format.line_spacing = 1.5
             
     file_path = os.path.abspath(os.path.join(exports_dir, filename))
     doc.save(file_path)
