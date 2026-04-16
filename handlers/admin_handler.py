@@ -7,14 +7,14 @@ from keyboards.inline_keyboards import admin_panel_kb, cancel_kb
 from config import ADMIN_PASSWORD
 from database import get_stats, ban_user, unban_user, get_all_users_details
 from services.broadcast_service import broadcast_message
-# Using straightforward plaintext comparison for this scale,
-# or hashed comparison if you decide to hash passwords in utils.py.
-# Based on user request: "Ask password. Validate with hashed password"
+# Admin paneli haqidagi barcha amallarni boshqaruvchi fayl.
+# Parolni tekshirish uchun utils.py dagi hash_password funksiyasidan foydalanish mumkin.
 from utils import hash_password
 
 router = Router()
 
 class AdminState(StatesGroup):
+    """Admin paneli uchun holatlar (FSM)."""
     waiting_for_password = State()
     waiting_for_broadcast = State()
     waiting_for_ban = State()
@@ -22,8 +22,7 @@ class AdminState(StatesGroup):
     is_admin = State()
 
 def verify_pwd(pwd: str) -> bool:
-    # Validate plaintext or hashed. Config holds literal from env.
-    # To properly check the hash of user input vs literal in DB/Env:
+    """Parolni tekshiradi. Hozircha oddiy matn ko'rinishida solishtiradi."""
     return pwd == ADMIN_PASSWORD
 
 @router.message(Command("admin"))
@@ -33,11 +32,11 @@ async def start_admin(message: Message, state: FSMContext):
 
 @router.message(AdminState.waiting_for_password)
 async def process_admin_password(message: Message, state: FSMContext):
-    # Using simple plaintext validation or hashing based on your .env configuration
+    """Kiritilgan parolni tekshiradi va adminga ruxsat beradi."""
     if verify_pwd(message.text):
         await message.answer("✅ Admin paneliga xush kelibsiz!", reply_markup=admin_panel_kb())
         await state.set_state(AdminState.is_admin)
-        # We delete the password message for security
+        # Xavfsizlik uchun parol yozilgan xabarni o'chirib tashlaymiz
         try:
             await message.delete()
         except Exception:
@@ -49,7 +48,7 @@ async def process_admin_password(message: Message, state: FSMContext):
 @router.callback_query(F.data == "admin_stats")
 async def show_stats(callback: CallbackQuery, state: FSMContext):
     curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
+    if curr_state != AdminState.is_admin:
         await callback.answer("Ruxsatsiz kirish!", show_alert=True)
         return
 
@@ -66,7 +65,7 @@ async def show_stats(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "admin_users_list")
 async def show_users_list(callback: CallbackQuery, state: FSMContext):
     curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
+    if curr_state != AdminState.is_admin:
         await callback.answer("Ruxsatsiz!", show_alert=True)
         return
 
@@ -81,10 +80,10 @@ async def show_users_list(callback: CallbackQuery, state: FSMContext):
         username_str = f"@{username}" if username else "Username yo'q"
         text += f"🆔 {user_id} - {username_str} ({name})\n"
         
-        # Checking message limit
+        # Telegram xabar limiti (4096) dan oshib ketmasligi uchun tekshiramiz
         if len(text) > 3900:
             await callback.message.answer(text)
-            text = "" # Reset for next part if needed
+            text = "" # Keyingi qism uchun tozalaymiz
             
     if text:
         await callback.message.answer(text)
@@ -93,7 +92,7 @@ async def show_users_list(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "admin_broadcast")
 async def ask_broadcast(callback: CallbackQuery, state: FSMContext):
     curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
+    if curr_state != AdminState.is_admin:
         await callback.answer("Ruxsatsiz", show_alert=True)
         return
         
@@ -111,7 +110,7 @@ async def process_broadcast(message: Message, state: FSMContext):
 @router.callback_query(F.data == "admin_ban")
 async def ask_ban(callback: CallbackQuery, state: FSMContext):
     curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
+    if curr_state != AdminState.is_admin:
         await callback.answer("Ruxsatsiz", show_alert=True)
         return
         
@@ -132,7 +131,7 @@ async def process_ban(message: Message, state: FSMContext):
 @router.callback_query(F.data == "admin_unban")
 async def ask_unban(callback: CallbackQuery, state: FSMContext):
     curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
+    if curr_state != AdminState.is_admin:
         await callback.answer("Ruxsatsiz", show_alert=True)
         return
         

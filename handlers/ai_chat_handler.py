@@ -9,6 +9,7 @@ from utils import send_split_message
 router = Router()
 
 class AIChatState(StatesGroup):
+    """AI bilan muloqot jarayoni uchun holatlar."""
     chatting = State()
 
 @router.callback_query(F.data == "menu_ai")
@@ -21,8 +22,8 @@ async def start_ai_chat(callback: CallbackQuery, state: FSMContext):
 
 @router.message(AIChatState.chatting)
 async def process_ai_message(message: Message):
-    # If user wants to quit, they can use provide buttons, but we also handle text-based quit?
-    # For now, we follow the current design where 'cancel' callback handles exit.
+    """Foydalanuvchi xabarini AI ga yuboradi va javobni qaytaradi."""
+    # Foydalanuvchi 'Bekor qilish' tugmasini bosa oladi, bu esa boshqa handlerda (cancel) boshqariladi.
     
     wait_msg = await message.answer("⏳ O'ylanmoqda...")
     

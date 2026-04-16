@@ -202,6 +202,6 @@ class BannedUserMiddleware(BaseMiddleware):
         from database import is_banned
         if event.from_user:
             if await is_banned(event.from_user.id):
-                # Optionally inform the user they are banned, or just drop
+                # Foydalanuvchi bloklangan bo'lsa, xabarga javob bermaymiz
                 return
         return await handler(event, data)
