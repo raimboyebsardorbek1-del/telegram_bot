@@ -1,10 +1,10 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import assignment_difficulty_kb, cancel_kb, main_menu_kb
 from services.ai_service import generate_assignment
-from utils import send_split_message
+from utils import send_split_message, create_docx
 
 router = Router()
 
@@ -53,6 +53,13 @@ async def process_difficulty(callback: CallbackQuery, state: FSMContext):
     try:
         assignment_response = await generate_assignment(subject, pages, difficulty)
         await send_split_message(callback.message, assignment_response)
+        
+        # Word faylni yaratish va yuborish
+        file_path = create_docx(assignment_response, f"Mustaqil_ish_{callback.from_user.id}.docx")
+        await callback.message.answer_document(
+            FSInputFile(file_path),
+            caption="📄 Mustaqil ishning Word varianti"
+        )
     except Exception as e:
         await callback.message.answer(f"❌ Kechirasiz, topshiriq tayyorlashda xatolik yuz berdi: {e}")
     
