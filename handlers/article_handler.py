@@ -10,6 +10,8 @@ router = Router()
 
 class ArticleState(StatesGroup):
     waiting_for_topic = State()
+    waiting_for_university = State()
+    waiting_for_author = State()
     waiting_for_pages = State()
     waiting_for_language = State()
 
@@ -24,9 +26,27 @@ async def start_article_flow(callback: CallbackQuery, state: FSMContext):
 @router.message(ArticleState.waiting_for_topic)
 async def process_topic(message: Message, state: FSMContext):
     await state.update_data(topic=message.text)
+    await state.set_state(ArticleState.waiting_for_university)
+    await message.answer(
+        "Oliygohingiz nomini kiriting (Titul varag'i uchun):",
+        reply_markup=cancel_kb()
+    )
+
+@router.message(ArticleState.waiting_for_university)
+async def process_university(message: Message, state: FSMContext):
+    await state.update_data(university=message.text)
+    await state.set_state(ArticleState.waiting_for_author)
+    await message.answer(
+        "Muallifning (talabaning) ism-familiyasini kiriting:",
+        reply_markup=cancel_kb()
+    )
+
+@router.message(ArticleState.waiting_for_author)
+async def process_author(message: Message, state: FSMContext):
+    await state.update_data(author=message.text)
     await state.set_state(ArticleState.waiting_for_pages)
     await message.answer(
-        "Maqola necha bet bo'lishi kerak? (Masalan: 3-5 bet):",
+        "Maqola taxminan necha bet bo'lishi kerak? (Masalan: 3-5 bet):",
         reply_markup=cancel_kb()
     )
 
@@ -47,6 +67,8 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     topic = data.get("topic")
     pages = data.get("pages")
+    university = data.get("university")
+    author = data.get("author")
     
     await callback.message.edit_text(f"⏳ '{topic}' mavzusida {pages} betli, {language} tilida maqola tayyorlanmoqda. Iltimos kuting...")
     
@@ -55,10 +77,10 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
         await send_split_message(callback.message, article)
         
         # Word faylni yaratish va yuborish
-        file_path = create_docx(article, f"Maqola_{callback.from_user.id}.docx")
+        file_path = create_docx(article, f"Maqola_{callback.from_user.id}.docx", university, author, topic, "MAQOLA")
         await callback.message.answer_document(
             FSInputFile(file_path),
-            caption="📄 Maqolaning Word varianti"
+            caption="📄 Maqolaning titul varag'i va rejasi bilan Word varianti"
         )
     except Exception as e:
         await callback.message.answer(f"❌ Kechirasiz, maqola tayyorlashda xatolik yuz berdi: {e}")

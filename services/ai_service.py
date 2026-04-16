@@ -14,8 +14,9 @@ async def generate_article(topic: str, pages: str, language: str) -> str:
     prompt = (
         f"Write an article about '{topic}' in {language} language. "
         f"The article should be approximately {pages} pages long. "
-        f"Structure it exactly like this: Sarlavha (Title), Kirish (Introduction), "
-        f"Asosiy qism (Main part), Xulosa (Conclusion)."
+        f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
+        f"Following the REJA section, provide the full content structured into: "
+        f"Kirish (Introduction), Asosiy qism (Main part), and Xulosa (Conclusion)."
     )
     try:
         response = await model.generate_content_async(prompt)
@@ -29,9 +30,11 @@ async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
     """Generates an assignment and solution."""
     prompt = (
         f"Create an independent work assignment (mustaqil ish) about the subject '{subject}' "
-        f"with '{difficulty}' difficulty level. The target length of the assignment should be "
-        f"approximately {pages} pages. Provide the assignment task first, and then the complete "
-        f"solution/content below it. The entire response must be in Uzbek."
+        f"with '{difficulty}' difficulty level. The target length should be "
+        f"approximately {pages} pages. "
+        f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
+        f"Following the REJA section, provide the complete solution/content. "
+        f"The entire response must be in Uzbek."
     )
     try:
         response = await model.generate_content_async(prompt)
