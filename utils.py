@@ -10,16 +10,16 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
-# User ID bo'yicha so'rovlar sonini kuzatish uchun oddiy TTL keshidan foydalanamiz
-# 1-soniyali TTL bitta foydalanuvchiga sekundiga faqat 1 ta xabar yuborishga ruxsat beradi
-request_cache = TTLCache(maxsize=10000, ttl=1.0)
+# We use a simple TTL cache to keep track of requests per user ID
+# 1-second TTL means 1 message per second allowed per user
+rate_limit_cache = TTLCache(maxsize=10000, ttl=1)
 
 def hash_password(password: str) -> str:
-    """Hashes the given password using SHA-256."""
+    """Returns SHA-256 hash of a given password."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 async def send_split_message(message: Message, text: str):
-    """Sends a long message by splitting it into smaller chunks."""
+    """Splits a long message into chunks and sends them sequentially."""
     limit = 4000  # Telegram limit is 4096, using 4000 for safety
     if len(text) <= limit:
         await message.answer(text)
@@ -29,19 +29,19 @@ async def send_split_message(message: Message, text: str):
             await message.answer(chunk)
 
 def clean_markdown(text: str) -> str:
-    """Cleans markdown symbols (###, **, _) from the generated text."""
-    # Remove bold/italic asterisks
+    """Removes common markdown-style formatting symbols."""
+    # Remove Bold/Italic stars
     text = re.sub(r'\*+', '', text)
-    # Sarlavha heshteglarini olib tashlash (###, #### va hk)
+    # Remove Hashtags headings (###, ####, etc.)
     text = re.sub(r'#+\s*', '', text)
-    # Pastki chiziklarni olib tashlash
+    # Remove Underscores
     text = re.sub(r'_+', '', text)
-    # Chiziqli ajratkichlarni olib tashlash
+    # Remove horizontal lines represented by dashes
     text = re.sub(r'-{3,}', '', text)
     return text.strip()
 
 def cleanup_old_files():
-    """Removes files older than 24 hours from the exports directory."""
+    """Deletes files older than 24 hours from the exports directory."""
     exports_dir = "exports"
     if not os.path.exists(exports_dir):
         return
@@ -50,7 +50,7 @@ def cleanup_old_files():
     for f in os.listdir(exports_dir):
         f_path = os.path.join(exports_dir, f)
         if os.path.isfile(f_path):
-            # 86400 soniya = 24 soat
+            # 86400 seconds = 24 hours
             if os.stat(f_path).st_mtime < now - 86400:
                 try:
                     os.remove(f_path)
@@ -58,7 +58,7 @@ def cleanup_old_files():
                     pass
 
 def create_docx(text: str, filename: str, university: str, author: str, topic: str, doc_type: str) -> str:
-    """Creates a .docx file with a cover page, outline, and main content."""
+    """Generates a structured .docx file with Cover, Outline, and Content."""
     exports_dir = "exports"
     if not os.path.exists(exports_dir):
         os.makedirs(exports_dir)
@@ -67,8 +67,8 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     
     doc = Document()
     
-    # --- 1-BET: TITUL ---
-    # Vazirlik va Oliygoh nomi birgalikda
+    # --- PAGE 1: COVER ---
+    # Combined Ministry and University Name
     uni_text = f"O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM FAN VA INNOVATSIYA VAZIRLIGI\n{university.upper()}"
     p_header = doc.add_paragraph()
     p_header.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -76,10 +76,10 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     run_header.bold = True
     run_header.font.size = Pt(18)
     
-    # Kataroq bo'sh joy
+    # Large Space
     for _ in range(6): doc.add_paragraph("")
     
-    # Ish turi (MUSTAQIL ISH / MAQOLA)
+    # Document Type (MUSTAQIL ISH / MAQOLA)
     p3 = doc.add_paragraph()
     p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run3 = p3.add_run(doc_type.upper())
@@ -88,23 +88,23 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     
     doc.add_paragraph("")
     
-    # Mavzu
+    # Topic
     p4 = doc.add_paragraph()
     p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run4 = p4.add_run(topic.upper())
     run4.bold = True
     run4.font.size = Pt(16)
     
-    # Muallifdan oldin bo'sh joy
+    # Space before author
     for _ in range(4): doc.add_paragraph("")
     
-    # Muallif haqida ma'lumot
+    # Author Info
     p5 = doc.add_paragraph()
     p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run5 = p5.add_run(f"Bajardi: {author}")
     run5.font.size = Pt(14)
     
-    # O'quv yilini pastga tushirish
+    # Push Year to bottom
     for _ in range(6): doc.add_paragraph("")
     
     p6 = doc.add_paragraph()
@@ -114,11 +114,10 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     
     doc.add_page_break()
     
-    # --- 2-BET: REJA ---
-    # AI matnidan REJA qismini ajratib olishga harakat qilamiz
+    # --- PAGE 2: OUTLINE (REJA) ---
     content_parts = text.split("REJA:", 1)
     if len(content_parts) > 1:
-        parts = content_parts[1].split("\n\n", 1)  # Odatda REJA dan keyin ikkita yangi qator keladi
+        parts = content_parts[1].split("\n\n", 1)
         reja_text = parts[0].strip()
         actual_content = parts[1].strip() if len(parts) > 1 else ""
     else:
@@ -134,7 +133,7 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     doc.add_paragraph("")
     
     if reja_text:
-        # Rejani qo'shishdan oldin tozalaymiz
+        # Clean reja before adding
         for line in reja_text.split("\n"):
             if line.strip():
                 p_r = doc.add_paragraph()
@@ -145,27 +144,27 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
         
     doc.add_page_break()
     
-    # --- 3-BET+: ASOSIY MATN ---
-    # Paragraf uzilishlarini aniqlash uchun matnni qatorlarga bo'lamiz
+    # --- PAGE 3+: CONTENT ---
+    # Split content by double newlines or similar to detect paragraph breaks
     paragraphs = actual_content.split('\n')
     for line in paragraphs:
         if not line.strip():
             continue
             
         p = doc.add_paragraph()
-        # Qatorlar orasini 1.5 qilib belgilash
+        # Set 1.5 lines spacing
         p.paragraph_format.line_spacing = 1.5
         
         cleaned_line = clean_markdown(line)
         run = p.add_run(cleaned_line)
         run.font.size = Pt(14)
         
-        # Sarlavhalar uchun qalinlashtirish (agar hamma harf katta yoki ### bo'lsa)
+        # Simple bold check for headers (if entire line was uppercase in original)
         if line.isupper() or line.strip().startswith('###'):
             run.bold = True
             
-        # Paragraflar orasida bo'sh joy qo'shish
-        # To'g'rilikni saqlash uchun bo'sh paragrafga ham 1.5 spacing beramiz
+        # Add space between paragraphs as requested
+        # We also set 1.5 spacing for these empty paragraphs to maintain consistency
         empty_p = doc.add_paragraph("")
         empty_p.paragraph_format.line_spacing = 1.5
             
@@ -174,25 +173,23 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
     return file_path
 
 class ThrottlingMiddleware(BaseMiddleware):
-    """Xabar yuborish tezligini cheklab, spamdan himoya qiluvchi oddiy middleware."""
+    """Simple anti-spam middleware to prevent rapid messaging (Rate Limit)."""
     async def __call__(
         self,
         handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
         event: Message,
         data: Dict[str, Any]
     ) -> Any:
-        user_id = event.from_user.id
-        
-        # Agar user keshda bo'lsa, xabarga javob bermaymiz
-        if user_id in request_cache:
-            return
-        
-        # Userni keshga qo'shamiz
-        request_cache[user_id] = True
+        if event.from_user:
+            user_id = event.from_user.id
+            if user_id in rate_limit_cache:
+                # Silently drop the spamming message
+                return
+            rate_limit_cache[user_id] = True
         return await handler(event, data)
 
 class BannedUserMiddleware(BaseMiddleware):
-    """Foydalanuvchi bloklanganligini tekshiruvchi middleware."""
+    """Middleware to check if the user is banned from using the bot."""
     async def __call__(
         self,
         handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
@@ -202,6 +199,6 @@ class BannedUserMiddleware(BaseMiddleware):
         from database import is_banned
         if event.from_user:
             if await is_banned(event.from_user.id):
-                # Foydalanuvchi bloklangan bo'lsa, xabarga javob bermaymiz
+                # Optionally inform the user they are banned, or just drop
                 return
         return await handler(event, data)

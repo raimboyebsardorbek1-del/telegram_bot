@@ -9,7 +9,6 @@ from utils import send_split_message, create_docx
 router = Router()
 
 class ArticleState(StatesGroup):
-    """FSM States for the article creation process."""
     waiting_for_topic = State()
     waiting_for_university = State()
     waiting_for_author = State()
@@ -17,11 +16,10 @@ class ArticleState(StatesGroup):
     waiting_for_language = State()
 
 @router.callback_query(F.data == "menu_article")
-async def start_article(callback: CallbackQuery, state: FSMContext):
-    """Starts the article writing process."""
+async def start_article_flow(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ArticleState.waiting_for_topic)
     await callback.message.edit_text(
-        "Maqola mavzusini kiriting:",
+        "📚 Yaxshi! Qaysi mavzuda maqola yozmoqchisiz? Mavzuni kiriting:",
         reply_markup=cancel_kb()
     )
 
@@ -81,7 +79,7 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
         file_path = create_docx(article, f"Maqola_{callback.from_user.id}.docx", university, author, topic, "MAQOLA")
         await callback.message.answer_document(
             FSInputFile(file_path),
-            caption="📄 Maqolaning Word varianti"
+            caption="📄 Maqolaning titul varag'i va rejasi bilan Word varianti"
         )
     except Exception as e:
         await callback.message.answer(f"❌ Kechirasiz, maqola tayyorlashda xatolik yuz berdi: {e}")
