@@ -18,7 +18,8 @@ from handlers import (
     article_handler,
     assignment_handler,
     ai_chat_handler,
-    admin_handler
+    admin_handler,
+    payment_handler
 )
 
 async def handle(request):
@@ -86,8 +87,9 @@ async def main():
     dp.message.middleware(ThrottlingMiddleware())
     dp.message.middleware(BannedUserMiddleware())
 
-    # Register routers (order is somewhat important but generally handled by filters)
+    # Routerlarni ro'yxatdan o'tkazish
     dp.include_router(user_handlers.router)
+    dp.include_router(payment_handler.router)  # To'lov tasdiqlash (approve/reject)
     dp.include_router(article_handler.router)
     dp.include_router(assignment_handler.router)
     dp.include_router(ai_chat_handler.router)

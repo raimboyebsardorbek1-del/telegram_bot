@@ -14,7 +14,7 @@ def main_menu_kb() -> InlineKeyboardMarkup:
 def article_language_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="O‘zbek", callback_data="lang_uz")],
+            [InlineKeyboardButton(text="O'zbek", callback_data="lang_uz")],
             [InlineKeyboardButton(text="Rus", callback_data="lang_ru")],
             [InlineKeyboardButton(text="Ingliz", callback_data="lang_en")]
         ]
@@ -24,7 +24,7 @@ def assignment_difficulty_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Oson", callback_data="diff_easy")],
-            [InlineKeyboardButton(text="O‘rta", callback_data="diff_medium")],
+            [InlineKeyboardButton(text="O'rta", callback_data="diff_medium")],
             [InlineKeyboardButton(text="Qiyin", callback_data="diff_hard")]
         ]
     )
@@ -45,5 +45,25 @@ def cancel_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")]
+        ]
+    )
+
+def payment_confirm_kb(payment_id: str) -> InlineKeyboardMarkup:
+    """Foydalanuvchiga 'To'ladim' tugmasini ko'rsatish."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ To'ladim", callback_data=f"paid_{payment_id}")],
+            [InlineKeyboardButton(text="🏠 Asosiy menyu", callback_data="cancel")]
+        ]
+    )
+
+def admin_payment_approval_kb(payment_id: str) -> InlineKeyboardMarkup:
+    """Admin uchun to'lovni tasdiqlash yoki rad etish tugmalari."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_{payment_id}"),
+                InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_{payment_id}")
+            ]
         ]
     )
