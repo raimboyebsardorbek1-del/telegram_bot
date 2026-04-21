@@ -48,9 +48,15 @@ async def init_db():
                 user_id INTEGER,
                 amount REAL,
                 status TEXT DEFAULT 'pending',
+                proof_file_id TEXT DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        # Eski bazada proof_file_id ustuni bo'lmasligi mumkin
+        try:
+            await db.execute("ALTER TABLE payments ADD COLUMN proof_file_id TEXT DEFAULT NULL")
+        except Exception:
+            pass  # Ustun allaqachon mavjud
         await db.commit()
         logging.info("Database initialized with structured tables.")
 
@@ -128,7 +134,10 @@ async def create_payment(payment_id: str, user_id: int, amount: float):
 
 async def get_payment(payment_id: str) -> dict:
     async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT payment_id, user_id, amount, status, created_at FROM payments WHERE payment_id = ?", (payment_id,)) as cursor:
+        async with db.execute(
+            "SELECT payment_id, user_id, amount, status, proof_file_id, created_at FROM payments WHERE payment_id = ?",
+            (payment_id,)
+        ) as cursor:
             row = await cursor.fetchone()
             if row:
                 return {
@@ -136,9 +145,19 @@ async def get_payment(payment_id: str) -> dict:
                     "user_id": row[1],
                     "amount": row[2],
                     "status": row[3],
-                    "created_at": row[4]
+                    "proof_file_id": row[4],
+                    "created_at": row[5]
                 }
             return None
+
+async def save_payment_proof(payment_id: str, file_id: str):
+    """To'lov cheki rasm file_id ni bazaga saqlash."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute(
+            "UPDATE payments SET proof_file_id = ? WHERE payment_id = ?",
+            (file_id, payment_id)
+        )
+        await db.commit()
 
 async def update_payment_status(payment_id: str, status: str):
     async with aiosqlite.connect(DB_NAME) as db:
