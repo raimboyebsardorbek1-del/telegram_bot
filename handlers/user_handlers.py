@@ -54,7 +54,7 @@ async def cancel_action(callback: CallbackQuery, state: FSMContext):
 async def contact_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         "📞 Aloqa bo'limi:\n\n"
-        "Admin: @admin_username\n"
+        "Admin: @urdu_admin\n"
         "Yordam uchun biz bilan bog'laning!\n\n"
         "Asosiy menyuga qaytish:",
         reply_markup=main_menu_kb()
@@ -169,7 +169,7 @@ async def receive_payment_proof(message: Message, state: FSMContext):
         )
     except Exception:
         await message.answer(
-            "❌ Xatolik yuz berdi. Iltimos, @admin_username ga murojaat qiling.",
+            "❌ Xatolik yuz berdi. Iltimos, @urdu_admin ga murojaat qiling.",
             reply_markup=main_menu_kb()
         )
 
