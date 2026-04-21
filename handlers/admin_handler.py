@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import admin_panel_kb, cancel_kb
 from config import ADMIN_PASSWORD
-from database import get_stats, ban_user, unban_user, get_all_users_details
+from database import get_stats, ban_user, unban_user, get_all_users_details, get_recent_payments
 from services.broadcast_service import broadcast_message
 # Using straightforward plaintext comparison for this scale,
 # or hashed comparison if you decide to hash passwords in utils.py.
@@ -61,6 +61,30 @@ async def show_stats(callback: CallbackQuery, state: FSMContext):
         f"🚫 Ban qilinganlar: {stats['banned']}"
     )
     await callback.message.answer(text)
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_payments")
+async def show_payments(callback: CallbackQuery, state: FSMContext):
+    curr_state = await state.get_state()
+    if curr_state != AdminState.is_admin.state:
+        await callback.answer("Ruxsatsiz!", show_alert=True)
+        return
+
+    payments = await get_recent_payments(10)
+    if not payments:
+        await callback.message.answer("To'lovlar topilmadi.")
+        await callback.answer()
+        return
+
+    text = "💳 So'nggi 10 to'lov:\n\n"
+    for p in payments:
+        status_icon = "✅" if p['status'] == 'paid' else "⏳"
+        text += f"ID: <code>{p['payment_id'][:8]}...</code>\n"
+        text += f"User: {p['user_id']} | {p['amount']} so'm\n"
+        text += f"Status: {status_icon} | Sana: {p['date']}\n"
+        text += "-" * 20 + "\n"
+        
+    await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
 
 @router.callback_query(F.data == "admin_users_list")

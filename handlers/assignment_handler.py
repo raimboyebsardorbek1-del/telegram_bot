@@ -5,6 +5,7 @@ from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import assignment_difficulty_kb, cancel_kb, main_menu_kb
 from services.ai_service import generate_assignment
 from utils import send_split_message, create_docx
+from database import check_subscription
 
 router = Router()
 
@@ -17,6 +18,10 @@ class AssignmentState(StatesGroup):
 
 @router.callback_query(F.data == "menu_assignment")
 async def start_assignment_flow(callback: CallbackQuery, state: FSMContext):
+    if not await check_subscription(callback.from_user.id):
+        await callback.answer("Sizda faol obuna yo'q! Iltimos, obuna sotib oling.", show_alert=True)
+        return
+        
     await state.set_state(AssignmentState.waiting_for_subject)
     await callback.message.edit_text(
         "📝 Mustaqil ish uchun fanni (yoki mavzuni) kiriting:",

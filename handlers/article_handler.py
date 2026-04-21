@@ -5,6 +5,7 @@ from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import article_language_kb, cancel_kb, main_menu_kb
 from services.ai_service import generate_article
 from utils import send_split_message, create_docx
+from database import check_subscription
 
 router = Router()
 
@@ -17,6 +18,10 @@ class ArticleState(StatesGroup):
 
 @router.callback_query(F.data == "menu_article")
 async def start_article_flow(callback: CallbackQuery, state: FSMContext):
+    if not await check_subscription(callback.from_user.id):
+        await callback.answer("Sizda faol obuna yo'q! Iltimos, obuna sotib oling.", show_alert=True)
+        return
+        
     await state.set_state(ArticleState.waiting_for_topic)
     await callback.message.edit_text(
         "📚 Yaxshi! Qaysi mavzuda maqola yozmoqchisiz? Mavzuni kiriting:",

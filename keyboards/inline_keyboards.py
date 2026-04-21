@@ -6,6 +6,7 @@ def main_menu_kb() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📚 Maqola yozish", callback_data="menu_article")],
             [InlineKeyboardButton(text="📝 Mustaqil ish", callback_data="menu_assignment")],
             [InlineKeyboardButton(text="🤖 AI yordamchi", callback_data="menu_ai")],
+            [InlineKeyboardButton(text="💳 Obuna sotib olish", callback_data="menu_subscribe")],
             [InlineKeyboardButton(text="📞 Aloqa", callback_data="menu_contact")]
         ]
     )
@@ -32,6 +33,7 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="📊 Statistika", callback_data="admin_stats")],
+            [InlineKeyboardButton(text="💳 To'lovlarni ko'rish", callback_data="admin_payments")],
             [InlineKeyboardButton(text="📢 Broadcast", callback_data="admin_broadcast")],
             [InlineKeyboardButton(text="👥 Foydalanuvchilar ro'yxati", callback_data="admin_users_list")],
             [InlineKeyboardButton(text="🚫 Ban user", callback_data="admin_ban")],

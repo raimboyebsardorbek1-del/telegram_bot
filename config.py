@@ -7,6 +7,10 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "default_secret_for_local_dev")
+
+SUBSCRIPTION_PRICE = 15000  # UZS, masalan
+SUBSCRIPTION_DAYS = 30
 
 # Add some basic validation to fail fast if config is missing
 if not BOT_TOKEN:

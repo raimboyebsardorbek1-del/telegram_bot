@@ -5,6 +5,7 @@ from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import cancel_kb, main_menu_kb
 from services.ai_service import chat_with_gemini
 from utils import send_split_message
+from database import check_subscription
 
 router = Router()
 
@@ -13,6 +14,10 @@ class AIChatState(StatesGroup):
 
 @router.callback_query(F.data == "menu_ai")
 async def start_ai_chat(callback: CallbackQuery, state: FSMContext):
+    if not await check_subscription(callback.from_user.id):
+        await callback.answer("Sizda faol obuna yo'q! Iltimos, obuna sotib oling.", show_alert=True)
+        return
+        
     await state.set_state(AIChatState.chatting)
     await callback.message.edit_text(
         "🤖 AI yordamchi bilan suhbatdasiz. Savolingizni yozing (chiqish uchun 'Bekor qilish' tugmasini bosing):",
