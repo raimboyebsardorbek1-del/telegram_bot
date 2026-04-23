@@ -7,7 +7,15 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Admin Telegram ID
+# Safely convert ADMIN_ID to int
+admin_id_env = os.getenv("ADMIN_ID", "0")
+try:
+    if admin_id_env and admin_id_env.isdigit():
+        ADMIN_ID = int(admin_id_env)
+    else:
+        ADMIN_ID = 0
+except ValueError:
+    ADMIN_ID = 0
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "default_secret_for_local_dev")
 
 # Click to'lov sozlamalari
