@@ -19,7 +19,9 @@ from handlers import (
     assignment_handler,
     ai_chat_handler,
     admin_handler,
-    payment_handler
+    payment_handler,
+    report_handler,
+    presentation_handler
 )
 
 async def handle(request):
@@ -91,6 +93,8 @@ async def main():
     dp.include_router(user_handlers.router)
     dp.include_router(payment_handler.router)  # To'lov tasdiqlash (approve/reject)
     dp.include_router(article_handler.router)
+    dp.include_router(report_handler.router)
+    dp.include_router(presentation_handler.router)
     dp.include_router(assignment_handler.router)
     dp.include_router(ai_chat_handler.router)
     dp.include_router(admin_handler.router)

@@ -186,4 +186,22 @@ async def proof_not_photo(message: Message):
     )
 
 
-
+@router.callback_query(F.data == "menu_invite")
+async def invite_handler(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    bot_link = f"https://t.me/{(await callback.message.bot.get_me()).username}?start={user_id}"
+    
+    text = (
+        "👥 <b>Do'stlarni taklif qiling!</b>\n\n"
+        "Botimizni do'stlaringizga tavsiya qiling va ularga ham AI yordamidan foydalanish imkoniyatini bering.\n\n"
+        "Sizning taklif havolangiz:\n"
+        f"<code>{bot_link}</code>\n\n"
+        "Ushbu havolani nusxalab, do'stlaringizga yuboring! ✨"
+    )
+    
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=main_menu_kb()
+    )
+    await callback.answer()

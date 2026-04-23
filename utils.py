@@ -9,6 +9,8 @@ import re
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
+from pptx import Presentation
+from pptx.util import Inches, Pt as PptxPt
 
 # We use a simple TTL cache to keep track of requests per user ID
 # 1-second TTL means 1 message per second allowed per user
@@ -170,6 +172,48 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
             
     file_path = os.path.abspath(os.path.join(exports_dir, filename))
     doc.save(file_path)
+    return file_path
+
+def create_pptx(text: str, filename: str, topic: str, author: str) -> str:
+    """Generates a .pptx file with slides from structured text."""
+    exports_dir = "exports"
+    if not os.path.exists(exports_dir):
+        os.makedirs(exports_dir)
+    
+    cleanup_old_files()
+    
+    prs = Presentation()
+    
+    # --- SLIDE 1: TITLE SLIDE ---
+    title_slide_layout = prs.slide_layouts[0]
+    slide = prs.slides.add_slide(title_slide_layout)
+    slide.shapes.title.text = topic.upper()
+    slide.placeholders[1].text = f"Taqdimotchi: {author}\n2025-2026 O'quv Yili"
+    
+    # --- SLIDES 2+: CONTENT ---
+    sections = re.split(r'Slayd \d+:|Bo\'lim:', text)
+    if len(sections) == 1: # If no markers, just split by double newlines or similar
+         sections = text.split('\n\n')
+
+    for section in sections:
+        section = section.strip()
+        if not section: continue
+        
+        lines = section.split('\n')
+        slide_title = lines[0].strip()[:50]
+        slide_body = "\n".join(lines[1:]).strip()
+        
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = clean_markdown(slide_title)
+        tf = slide.placeholders[1].text_frame
+        for line in slide_body.split('\n'):
+            if line.strip():
+                p = tf.add_paragraph()
+                p.text = clean_markdown(line)
+                p.level = 0
+
+    file_path = os.path.abspath(os.path.join(exports_dir, filename))
+    prs.save(file_path)
     return file_path
 
 class ThrottlingMiddleware(BaseMiddleware):

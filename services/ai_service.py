@@ -76,3 +76,43 @@ async def chat_with_gemini(user_id: int, message: str) -> str:
         if "quota" in str(e).lower():
             return "Kechirasiz, AI xizmati limiti tugagan. Iltimos bir ozdan so'ng harakat qilib ko'ring."
         return f"Xatolik yuz berdi. Savolingizga hozircha javob bera olmayman. (Xato: {e})"
+async def generate_report(topic: str, pages: str) -> str:
+    """Generates a report (referat)."""
+    match = re.search(r'(\d+)', str(pages))
+    num_pages = int(match.group(1)) if match else 10
+    word_target = num_pages * 300
+
+    prompt = (
+        f"Create a detailed report (referat) about '{topic}' in Uzbek language. "
+        f"The content MUST be at least {word_target} words long to fill exactly {num_pages} pages. "
+        f"Structure MUST start with a section titled 'REJA:' which lists the main points. "
+        f"Followed by introduction, detailed sections, and conclusion."
+    )
+    try:
+        response = await model.generate_content_async(prompt)
+        return response.text
+    except Exception as e:
+        import logging
+        logging.error(f"Error in generate_report: {e}")
+        return f"Xatolik yuz berdi. (Xato: {e})"
+
+async def generate_presentation_text(topic: str, slides: str) -> str:
+    """Generates text for slides."""
+    match = re.search(r'(\d+)', str(slides))
+    num_slides = int(match.group(1)) if match else 10
+
+    prompt = (
+        f"Create a presentation about '{topic}' in Uzbek language. "
+        f"Generate content for {num_slides} individual slides. "
+        f"For each slide, provide a Title and Bullet points. "
+        f"Format MUST be:\n"
+        f"Slayd 1: [Sarlavha]\n- [Point 1]\n- [Point 2]\n\n"
+        f"And so on."
+    )
+    try:
+        response = await model.generate_content_async(prompt)
+        return response.text
+    except Exception as e:
+        import logging
+        logging.error(f"Error in generate_presentation: {e}")
+        return f"Xatolik yuz berdi. (Xato: {e})"

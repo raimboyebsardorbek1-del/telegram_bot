@@ -5,8 +5,11 @@ def main_menu_kb() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="📚 Maqola yozish", callback_data="menu_article")],
             [InlineKeyboardButton(text="📝 Mustaqil ish", callback_data="menu_assignment")],
-            [InlineKeyboardButton(text="🤖 AI yordamchi", callback_data="menu_ai")],
+            [InlineKeyboardButton(text="📄 Referat", callback_data="menu_report")],
+            [InlineKeyboardButton(text="📊 Taqdimot", callback_data="menu_presentation")],
+            [InlineKeyboardButton(text="🤖 Ai yordamchi", callback_data="menu_ai")],
             [InlineKeyboardButton(text="💳 Obuna sotib olish", callback_data="menu_subscribe")],
+            [InlineKeyboardButton(text="👥 Dostlarni taklif qilish", callback_data="menu_invite")],
             [InlineKeyboardButton(text="📞 Aloqa", callback_data="menu_contact")]
         ]
     )
