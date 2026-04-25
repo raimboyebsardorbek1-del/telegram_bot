@@ -5,6 +5,7 @@ DB_NAME = "bot_database.sqlite"
 
 async def init_db():
     async with aiosqlite.connect(DB_NAME) as db:
+        # Users Table
         await db.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
@@ -15,17 +16,14 @@ async def init_db():
             )
         ''')
         
-        # In case the table already exists but without 'subscription_end'
-        try:
-            await db.execute("ALTER TABLE users ADD COLUMN subscription_end TIMESTAMP DEFAULT NULL")
-        except Exception:
-            pass # Column already exists or other error
-
+        # Banned Users
         await db.execute('''
             CREATE TABLE IF NOT EXISTS banned_users (
                 user_id INTEGER PRIMARY KEY
             )
         ''')
+
+        # AI History
         await db.execute('''
             CREATE TABLE IF NOT EXISTS ai_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,53 +33,58 @@ async def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # Usage Tracking (Free Once)
         await db.execute('''
-            CREATE TABLE IF NOT EXISTS logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                action TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            CREATE TABLE IF NOT EXISTS usage (
+                user_id INTEGER PRIMARY KEY,
+                maqola_used INTEGER DEFAULT 0,
+                mustaqil_used INTEGER DEFAULT 0,
+                referat_used INTEGER DEFAULT 0,
+                taqdimot_used INTEGER DEFAULT 0
             )
         ''')
+
+        # Orders Table (Pay Per Order)
         await db.execute('''
-            CREATE TABLE IF NOT EXISTS payments (
-                payment_id TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id TEXT PRIMARY KEY,
                 user_id INTEGER,
+                service_type TEXT,
+                pages TEXT,
                 amount REAL,
                 status TEXT DEFAULT 'pending',
-                proof_file_id TEXT DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        # Eski bazada proof_file_id ustuni bo'lmasligi mumkin
-        try:
-            await db.execute("ALTER TABLE payments ADD COLUMN proof_file_id TEXT DEFAULT NULL")
-        except Exception:
-            pass  # Ustun allaqachon mavjud
-        await db.commit()
-        logging.info("Database initialized with structured tables.")
 
+        # Balances Table
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS balances (
+                user_id INTEGER PRIMARY KEY,
+                amount REAL DEFAULT 0
+            )
+        ''')
+
+        await db.commit()
+        logging.info("Database initialized with all tables.")
+
+# --- USER FUNCTIONS ---
 async def add_user(user_id: int, name: str, username: str):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute(
             "INSERT OR IGNORE INTO users (id, name, username) VALUES (?, ?, ?)",
             (user_id, name, username)
         )
+        # Initialize usage and balance
+        await db.execute("INSERT OR IGNORE INTO usage (user_id) VALUES (?)", (user_id,))
+        await db.execute("INSERT OR IGNORE INTO balances (user_id) VALUES (?)", (user_id,))
         await db.commit()
 
 async def is_banned(user_id: int) -> bool:
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute("SELECT 1 FROM banned_users WHERE user_id = ?", (user_id,)) as cursor:
             return await cursor.fetchone() is not None
-
-async def ban_user(user_id: int):
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)", (user_id,))
-        await db.commit()
-
-async def unban_user(user_id: int):
-    async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("DELETE FROM banned_users WHERE user_id = ?", (user_id,))
-        await db.commit()
 
 async def log_ai_history(user_id: int, message: str, response: str):
     async with aiosqlite.connect(DB_NAME) as db:
@@ -91,27 +94,6 @@ async def log_ai_history(user_id: int, message: str, response: str):
         )
         await db.commit()
 
-async def get_all_users() -> list[int]:
-    async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT id FROM users") as cursor:
-            rows = await cursor.fetchall()
-            return [row[0] for row in rows]
-
-async def get_all_users_details() -> list[tuple]:
-    async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT id, name, username FROM users") as cursor:
-            return await cursor.fetchall()
-
-async def get_stats() -> dict:
-    async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT COUNT(*) FROM users") as c1:
-            total_users = (await c1.fetchone())[0]
-        async with db.execute("SELECT COUNT(*) FROM ai_history") as c2:
-            total_requests = (await c2.fetchone())[0]
-        async with db.execute("SELECT COUNT(*) FROM banned_users") as c3:
-            total_banned = (await c3.fetchone())[0]
-        return {"users": total_users, "requests": total_requests, "banned": total_banned}
-
 async def get_user_chat_history(user_id: int, limit: int = 5) -> list[tuple]:
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute(
@@ -119,83 +101,74 @@ async def get_user_chat_history(user_id: int, limit: int = 5) -> list[tuple]:
             (user_id, limit)
         ) as cursor:
             rows = await cursor.fetchall()
-            # Reverse to give chronological order
             return rows[::-1]
 
-# --- SUBSCRIPTION & PAYMENT FUNCTIONS ---
+# --- USAGE & ORDER FUNCTIONS ---
+async def check_free_usage(user_id: int, service_type: str) -> bool:
+    """Returns True if free usage is available for the given service."""
+    column = f"{service_type.lower()}_used"
+    async with aiosqlite.connect(DB_NAME) as db:
+        # Ensure user exists in usage table
+        await db.execute("INSERT OR IGNORE INTO usage (user_id) VALUES (?)", (user_id,))
+        async with db.execute(f"SELECT {column} FROM usage WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] == 0 if row else True
 
-async def create_payment(payment_id: str, user_id: int, amount: float):
+async def mark_free_usage(user_id: int, service_type: str):
+    column = f"{service_type.lower()}_used"
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute(f"UPDATE usage SET {column} = 1 WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+async def create_order(order_id: str, user_id: int, service_type: str, pages: str, amount: float):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute(
-            "INSERT INTO payments (payment_id, user_id, amount) VALUES (?, ?, ?)",
-            (payment_id, user_id, amount)
+            "INSERT INTO orders (order_id, user_id, service_type, pages, amount) VALUES (?, ?, ?, ?, ?)",
+            (order_id, user_id, service_type, pages, amount)
         )
         await db.commit()
 
-async def get_payment(payment_id: str) -> dict:
+async def get_order(order_id: str) -> dict:
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute(
-            "SELECT payment_id, user_id, amount, status, proof_file_id, created_at FROM payments WHERE payment_id = ?",
-            (payment_id,)
+            "SELECT order_id, user_id, service_type, pages, amount, status FROM orders WHERE order_id = ?",
+            (order_id,)
         ) as cursor:
             row = await cursor.fetchone()
             if row:
                 return {
-                    "payment_id": row[0],
+                    "order_id": row[0],
                     "user_id": row[1],
-                    "amount": row[2],
-                    "status": row[3],
-                    "proof_file_id": row[4],
-                    "created_at": row[5]
+                    "service_type": row[2],
+                    "pages": row[3],
+                    "amount": row[4],
+                    "status": row[5]
                 }
             return None
 
-async def save_payment_proof(payment_id: str, file_id: str):
-    """To'lov cheki rasm file_id ni bazaga saqlash."""
+async def update_order_status(order_id: str, status: str):
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute(
-            "UPDATE payments SET proof_file_id = ? WHERE payment_id = ?",
-            (file_id, payment_id)
-        )
+        await db.execute("UPDATE orders SET status = ? WHERE order_id = ?", (status, order_id))
         await db.commit()
 
-async def update_payment_status(payment_id: str, status: str):
+# --- BALANCE FUNCTIONS ---
+async def get_balance(user_id: int) -> float:
     async with aiosqlite.connect(DB_NAME) as db:
-        await db.execute("UPDATE payments SET status = ? WHERE payment_id = ?", (status, payment_id))
-        await db.commit()
-
-async def add_user_subscription(user_id: int, days: int):
-    async with aiosqlite.connect(DB_NAME) as db:
-        # Check current subscription
-        async with db.execute("SELECT subscription_end FROM users WHERE id = ?", (user_id,)) as cursor:
+        async with db.execute("SELECT amount FROM balances WHERE user_id = ?", (user_id,)) as cursor:
             row = await cursor.fetchone()
-            
-            # Using SQLite date/time modifiers
-            if row and row[0]:
-                # Add days to existing end date if it's in the future, else from NOW
-                # We'll do a simple raw SQL approach
-                await db.execute(
-                    "UPDATE users SET subscription_end = CASE "
-                    "WHEN subscription_end > CURRENT_TIMESTAMP THEN datetime(subscription_end, '+' || ? || ' days') "
-                    "ELSE datetime('now', '+' || ? || ' days') END WHERE id = ?",
-                    (days, days, user_id)
-                )
-            else:
-                await db.execute("UPDATE users SET subscription_end = datetime('now', '+' || ? || ' days') WHERE id = ?", (days, user_id))
-            
+            return row[0] if row else 0.0
+
+async def update_balance(user_id: int, amount: float):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("INSERT OR IGNORE INTO balances (user_id) VALUES (?)", (user_id,))
+        await db.execute("UPDATE balances SET amount = amount + ? WHERE user_id = ?", (amount, user_id))
         await db.commit()
 
-async def check_subscription(user_id: int) -> bool:
+# --- ADMIN STATS ---
+async def get_stats() -> dict:
     async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute(
-            "SELECT 1 FROM users WHERE id = ? AND subscription_end IS NOT NULL AND subscription_end > CURRENT_TIMESTAMP",
-            (user_id,)
-        ) as cursor:
-            return await cursor.fetchone() is not None
-
-async def get_recent_payments(limit: int = 10) -> list[dict]:
-    async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT payment_id, user_id, amount, status, created_at FROM payments ORDER BY created_at DESC LIMIT ?", (limit,)) as cursor:
-            rows = await cursor.fetchall()
-            return [{"payment_id": r[0], "user_id": r[1], "amount": r[2], "status": r[3], "date": r[4]} for r in rows]
-
+        async with db.execute("SELECT COUNT(*) FROM users") as c1:
+            total_users = (await c1.fetchone())[0]
+        async with db.execute("SELECT COUNT(*) FROM orders WHERE status = 'paid'") as c2:
+            paid_orders = (await c2.fetchone())[0]
+        return {"users": total_users, "paid_orders": paid_orders}

@@ -2,60 +2,89 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from keyboards.inline_keyboards import cancel_kb, main_menu_kb
+from keyboards.inline_keyboards import main_menu_kb, price_selection_kb, cancel_kb, payment_kb
+from database import check_free_usage, mark_free_usage, create_order
 from services.ai_service import generate_presentation_text
+from services.click_service import generate_click_url
 from utils import create_pptx
-from database import check_subscription
+from config import PRICES
+import uuid
 
 router = Router()
 
 class PresentationState(StatesGroup):
     waiting_for_topic = State()
-    waiting_for_slides = State()
     waiting_for_author = State()
+    waiting_for_tier = State()
 
 @router.callback_query(F.data == "menu_presentation")
 async def start_presentation_flow(callback: CallbackQuery, state: FSMContext):
-    if not await check_subscription(callback.from_user.id):
-        await callback.answer("Sizda faol obuna yo'q! Iltimos, obuna sotib oling.", show_alert=True)
-        return
-        
     await state.set_state(PresentationState.waiting_for_topic)
     await callback.message.edit_text(
-        "📊 Taqdimot bo'limi. Mavzuni kiriting:",
+        "📊 Taqdimot tayyorlash bo'limi.\n\nTaqdimot mavzusini kiriting:",
         reply_markup=cancel_kb()
     )
+    await callback.answer()
 
 @router.message(PresentationState.waiting_for_topic)
 async def process_topic(message: Message, state: FSMContext):
     await state.update_data(topic=message.text)
-    await state.set_state(PresentationState.waiting_for_slides)
-    await message.answer(
-        "Slaydlar sonini kiriting (Masalan: 10):",
-        reply_markup=cancel_kb()
-    )
-
-@router.message(PresentationState.waiting_for_slides)
-async def process_slides(message: Message, state: FSMContext):
-    await state.update_data(slides=message.text)
     await state.set_state(PresentationState.waiting_for_author)
-    await message.answer(
-        "Taqdimotchi ism-familiyasini kiriting:",
-        reply_markup=cancel_kb()
-    )
+    await message.answer("Taqdimotchi ism-familiyasini kiriting:", reply_markup=cancel_kb())
 
 @router.message(PresentationState.waiting_for_author)
 async def process_author(message: Message, state: FSMContext):
-    author = message.text
-    data = await state.get_data()
-    topic = data.get("topic")
-    slides = data.get("slides")
+    await state.update_data(author=message.text)
+    await state.set_state(PresentationState.waiting_for_tier)
+    await message.answer(
+        "Taqdimot necha slayd bo'lishini tanlang:",
+        reply_markup=price_selection_kb("taqdimot")
+    )
+
+@router.callback_query(PresentationState.waiting_for_tier, F.data.startswith("price_taqdimot_"))
+async def process_tier(callback: CallbackQuery, state: FSMContext):
+    tier = callback.data.split("_")[-1]
+    amount = PRICES["taqdimot"][tier]
     
-    await message.answer("⏳ Taqdimot tayyorlanmoqda, iltimos kuting...")
+    data = await state.get_data()
+    user_id = callback.from_user.id
+    
+    is_free = await check_free_usage(user_id, "taqdimot")
+    
+    if is_free:
+        await callback.message.edit_text(
+            f"🎁 <b>Sizda 1 marta bepul foydalanish mavjud!</b>\n\n"
+            f"Mavzu: {data['topic']}\n"
+            f"Slaydlar: {tier}\n\n"
+            "⏳ Taqdimot tayyorlanmoqda, iltimos kuting...",
+            parse_mode="HTML"
+        )
+        await mark_free_usage(user_id, "taqdimot")
+        await generate_and_send_presentation(callback.message, data, tier, user_id)
+        await state.clear()
+    else:
+        import json
+        order_id = f"ORDER_{uuid.uuid4().hex[:8].upper()}"
+        params = json.dumps({"topic": data["topic"], "author": data["author"]})
+        await create_order(order_id, user_id, "taqdimot", tier, amount, params)
+        click_url = generate_click_url(order_id, amount)
+        
+        text = (
+            f"📊 <b>Tanlandi:</b> {tier} slayd\n"
+            f"💰 <b>Narx:</b> {amount:,} so'm\n\n"
+            "Prezentatsiyani olish uchun to'lov qiling."
+        )
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_kb(click_url))
+        await state.clear()
+    await callback.answer()
+
+async def generate_and_send_presentation(message: Message, data: dict, tier: str, user_id: int):
+    topic = data.get("topic")
+    author = data.get("author")
     
     try:
-        presentation_text = await generate_presentation_text(topic, slides)
-        file_path = create_pptx(presentation_text, f"Taqdimot_{message.from_user.id}.pptx", topic, author)
+        content = await generate_presentation_text(topic, tier)
+        file_path = create_pptx(content, f"Taqdimot_{user_id}.pptx", topic, author)
         await message.answer_document(
             FSInputFile(file_path),
             caption=f"✅ '{topic}' mavzusidagi taqdimot tayyor!"
@@ -64,4 +93,3 @@ async def process_author(message: Message, state: FSMContext):
         await message.answer(f"❌ Xatolik: {e}")
     
     await message.answer("Asosiy menyu:", reply_markup=main_menu_kb())
-    await state.clear()

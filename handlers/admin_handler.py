@@ -5,12 +5,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import admin_panel_kb, cancel_kb
 from config import ADMIN_PASSWORD
-from database import get_stats, ban_user, unban_user, get_all_users_details, get_recent_payments
+from database import get_stats, ban_user, unban_user, get_all_users_details
 from services.broadcast_service import broadcast_message
-# Using straightforward plaintext comparison for this scale,
-# or hashed comparison if you decide to hash passwords in utils.py.
-# Based on user request: "Ask password. Validate with hashed password"
-from utils import hash_password
 
 router = Router()
 
@@ -22,8 +18,6 @@ class AdminState(StatesGroup):
     is_admin = State()
 
 def verify_pwd(pwd: str) -> bool:
-    # Validate plaintext or hashed. Config holds literal from env.
-    # To properly check the hash of user input vs literal in DB/Env:
     return pwd == ADMIN_PASSWORD
 
 @router.message(Command("admin"))
@@ -33,17 +27,15 @@ async def start_admin(message: Message, state: FSMContext):
 
 @router.message(AdminState.waiting_for_password)
 async def process_admin_password(message: Message, state: FSMContext):
-    # Using simple plaintext validation or hashing based on your .env configuration
     if verify_pwd(message.text):
         await message.answer("✅ Admin paneliga xush kelibsiz!", reply_markup=admin_panel_kb())
         await state.set_state(AdminState.is_admin)
-        # We delete the password message for security
         try:
             await message.delete()
         except Exception:
             pass
     else:
-        await message.answer("Ruxsat yo‘q")
+        await message.answer("Ruxsatsiz!")
         await state.clear()
 
 @router.callback_query(F.data == "admin_stats")
@@ -55,63 +47,11 @@ async def show_stats(callback: CallbackQuery, state: FSMContext):
 
     stats = await get_stats()
     text = (
-        "📊 Bot Statistikasi:\n\n"
-        f"👥 Umumiy foydalanuvchilar: {stats['users']}\n"
-        f"🤖 AI so'rovlar soni: {stats['requests']}\n"
-        f"🚫 Ban qilinganlar: {stats['banned']}"
+        "📊 <b>Bot Statistikasi</b>\n\n"
+        f"👥 Umumiy foydalanuvchilar: <b>{stats['users']}</b>\n"
+        f"💰 Muvaffaqiyatli to'lovlar: <b>{stats.get('paid_orders', 0)}</b>"
     )
-    await callback.message.answer(text)
-    await callback.answer()
-
-@router.callback_query(F.data == "admin_payments")
-async def show_payments(callback: CallbackQuery, state: FSMContext):
-    curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
-        await callback.answer("Ruxsatsiz!", show_alert=True)
-        return
-
-    payments = await get_recent_payments(10)
-    if not payments:
-        await callback.message.answer("To'lovlar topilmadi.")
-        await callback.answer()
-        return
-
-    text = "💳 So'nggi 10 to'lov:\n\n"
-    for p in payments:
-        status_icon = "✅" if p['status'] == 'paid' else "⏳"
-        text += f"ID: <code>{p['payment_id'][:8]}...</code>\n"
-        text += f"User: {p['user_id']} | {p['amount']} so'm\n"
-        text += f"Status: {status_icon} | Sana: {p['date']}\n"
-        text += "-" * 20 + "\n"
-        
     await callback.message.answer(text, parse_mode="HTML")
-    await callback.answer()
-
-@router.callback_query(F.data == "admin_users_list")
-async def show_users_list(callback: CallbackQuery, state: FSMContext):
-    curr_state = await state.get_state()
-    if curr_state != AdminState.is_admin.state:
-        await callback.answer("Ruxsatsiz!", show_alert=True)
-        return
-
-    users = await get_all_users_details()
-    if not users:
-        await callback.message.answer("Foydalanuvchilar mavjud emas.")
-        await callback.answer()
-        return
-
-    text = "👥 Foydalanuvchilar ro'yxati:\n\n"
-    for user_id, name, username in users:
-        username_str = f"@{username}" if username else "Username yo'q"
-        text += f"🆔 {user_id} - {username_str} ({name})\n"
-        
-        # Checking message limit
-        if len(text) > 3900:
-            await callback.message.answer(text)
-            text = "" # Reset for next part if needed
-            
-    if text:
-        await callback.message.answer(text)
     await callback.answer()
 
 @router.callback_query(F.data == "admin_broadcast")
