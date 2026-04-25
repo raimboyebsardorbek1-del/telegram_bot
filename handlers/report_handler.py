@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from keyboards.inline_keyboards import main_menu_kb, price_selection_kb, cancel_kb, payment_kb
+from keyboards.inline_keyboards import main_menu_kb, price_selection_kb, cancel_kb, payment_method_kb
 from database import check_free_usage, mark_free_usage, create_order
 from services.ai_service import generate_report
 from services.click_service import generate_click_url
@@ -79,9 +79,9 @@ async def process_tier(callback: CallbackQuery, state: FSMContext):
         text = (
             f"📄 <b>Tanlandi:</b> {tier} bet\n"
             f"💰 <b>Narx:</b> {amount:,} so'm\n\n"
-            "Referatingizni olish uchun to'lov qiling."
+            "To'lov usulini tanlang. Muvaffaqiyatli to'lovdan so'ng referat yuboriladi."
         )
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_kb(click_url))
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_method_kb(order_id, click_url))
         await state.clear()
     await callback.answer()
 

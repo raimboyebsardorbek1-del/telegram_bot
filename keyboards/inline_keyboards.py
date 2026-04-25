@@ -30,11 +30,30 @@ def price_selection_kb(service_type: str) -> InlineKeyboardMarkup:
     keyboard.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-def payment_kb(url: str) -> InlineKeyboardMarkup:
+def payment_method_kb(order_id: str, click_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="💳 To'lov qilish", url=url)],
+            [InlineKeyboardButton(text="💳 Avtomatik (Click)", url=click_url)],
+            [InlineKeyboardButton(text="💳 Karta orqali to'lov", callback_data=f"pay_card_{order_id}")],
             [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")]
+        ]
+    )
+
+def payment_confirm_kb(order_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ To'ladim", callback_data=f"paid_{order_id}")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")]
+        ]
+    )
+
+def admin_order_approval_kb(order_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_{order_id}"),
+                InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_{order_id}")
+            ]
         ]
     )
 
