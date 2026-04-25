@@ -53,6 +53,7 @@ async def init_db():
                 service_type TEXT,
                 pages TEXT,
                 amount REAL,
+                parameters TEXT,
                 status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -85,6 +86,27 @@ async def is_banned(user_id: int) -> bool:
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute("SELECT 1 FROM banned_users WHERE user_id = ?", (user_id,)) as cursor:
             return await cursor.fetchone() is not None
+
+async def ban_user(user_id: int):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("INSERT OR IGNORE INTO banned_users (user_id) VALUES (?)", (user_id,))
+        await db.commit()
+
+async def unban_user(user_id: int):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("DELETE FROM banned_users WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+async def get_all_users() -> list[int]:
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute("SELECT id FROM users") as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
+async def get_all_users_details() -> list[tuple]:
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute("SELECT id, name, username FROM users") as cursor:
+            return await cursor.fetchall()
 
 async def log_ai_history(user_id: int, message: str, response: str):
     async with aiosqlite.connect(DB_NAME) as db:
@@ -120,18 +142,18 @@ async def mark_free_usage(user_id: int, service_type: str):
         await db.execute(f"UPDATE usage SET {column} = 1 WHERE user_id = ?", (user_id,))
         await db.commit()
 
-async def create_order(order_id: str, user_id: int, service_type: str, pages: str, amount: float):
+async def create_order(order_id: str, user_id: int, service_type: str, pages: str, amount: float, parameters: str):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute(
-            "INSERT INTO orders (order_id, user_id, service_type, pages, amount) VALUES (?, ?, ?, ?, ?)",
-            (order_id, user_id, service_type, pages, amount)
+            "INSERT INTO orders (order_id, user_id, service_type, pages, amount, parameters) VALUES (?, ?, ?, ?, ?, ?)",
+            (order_id, user_id, service_type, pages, amount, parameters)
         )
         await db.commit()
 
 async def get_order(order_id: str) -> dict:
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute(
-            "SELECT order_id, user_id, service_type, pages, amount, status FROM orders WHERE order_id = ?",
+            "SELECT order_id, user_id, service_type, pages, amount, status, parameters FROM orders WHERE order_id = ?",
             (order_id,)
         ) as cursor:
             row = await cursor.fetchone()
@@ -142,7 +164,8 @@ async def get_order(order_id: str) -> dict:
                     "service_type": row[2],
                     "pages": row[3],
                     "amount": row[4],
-                    "status": row[5]
+                    "status": row[5],
+                    "parameters": row[6]
                 }
             return None
 
