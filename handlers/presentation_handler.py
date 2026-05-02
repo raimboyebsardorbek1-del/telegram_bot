@@ -7,7 +7,8 @@ from database import check_free_usage, mark_free_usage, create_order
 from services.ai_service import generate_presentation_text
 from services.click_service import generate_click_url
 from utils import create_pptx
-from config import PRICES
+from config import PRICES, CLICK_CARD_NUMBER
+from keyboards.inline_keyboards import payment_confirm_kb
 import uuid
 
 router = Router()
@@ -67,14 +68,16 @@ async def process_tier(callback: CallbackQuery, state: FSMContext):
         order_id = f"ORDER_{uuid.uuid4().hex[:8].upper()}"
         params = json.dumps({"topic": data["topic"], "author": data["author"]})
         await create_order(order_id, user_id, "taqdimot", tier, amount, params)
-        click_url = generate_click_url(order_id, amount)
         
         text = (
             f"📊 <b>Tanlandi:</b> {tier} slayd\n"
             f"💰 <b>Narx:</b> {amount:,} so'm\n\n"
-            "To'lov usulini tanlang. To'lovdan so'ng prezentatsiya yuboriladi."
+            f"💳 <b>Karta orqali to'lov</b>\n"
+            f"Quyidagi karta raqamiga to'lovni amalga oshiring:\n"
+            f"<code>{CLICK_CARD_NUMBER}</code>\n\n"
+            f"To'lovni amalga oshirgandan so'ng, <b>\"To'ladim\"</b> tugmasini bosing."
         )
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_method_kb(order_id, click_url))
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_confirm_kb(order_id))
         await state.clear()
     await callback.answer()
 

@@ -7,7 +7,8 @@ from database import check_free_usage, mark_free_usage, create_order
 from services.ai_service import generate_article
 from services.click_service import generate_click_url
 from utils import create_docx
-from config import PRICES
+from config import PRICES, CLICK_CARD_NUMBER
+from keyboards.inline_keyboards import payment_confirm_kb
 import uuid
 
 router = Router()
@@ -71,21 +72,21 @@ async def process_tier(callback: CallbackQuery, state: FSMContext):
         await generate_and_send_article(callback.message, data, tier, user_id)
         await state.clear()
     else:
-        # Create Order and Show Click Link
         import json
         order_id = f"ORDER_{uuid.uuid4().hex[:8].upper()}"
         params = json.dumps({"topic": data["topic"], "university": data["university"], "author": data["author"]})
         
         await create_order(order_id, user_id, "maqola", tier, amount, params)
         
-        click_url = generate_click_url(order_id, amount)
-        
         text = (
             f"📄 <b>Tanlandi:</b> {tier} bet\n"
             f"💰 <b>Narx:</b> {amount:,} so'm\n\n"
-            "To'lov usulini tanlang. Muvaffaqiyatli to'lovdan so'ng maqola avtomatik yuboriladi."
+            f"💳 <b>Karta orqali to'lov</b>\n"
+            f"Quyidagi karta raqamiga to'lovni amalga oshiring:\n"
+            f"<code>{CLICK_CARD_NUMBER}</code>\n\n"
+            f"To'lovni amalga oshirgandan so'ng, <b>\"To'ladim\"</b> tugmasini bosing."
         )
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_method_kb(order_id, click_url))
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_confirm_kb(order_id))
         await state.clear()
     
     await callback.answer()

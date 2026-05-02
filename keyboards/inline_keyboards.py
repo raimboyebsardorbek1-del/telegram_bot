@@ -30,13 +30,7 @@ def price_selection_kb(service_type: str) -> InlineKeyboardMarkup:
     keyboard.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="cancel")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-def payment_method_kb(order_id: str, click_url: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Karta orqali to'lov (Screenshot yuborish)", callback_data=f"pay_card_{order_id}")],
-            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")]
-        ]
-    )
+
 
 def payment_confirm_kb(order_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(

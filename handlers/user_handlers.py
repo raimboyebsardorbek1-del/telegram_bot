@@ -88,24 +88,6 @@ async def contact_handler(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("pay_card_"))
-async def pay_card_handler(callback: CallbackQuery, state: FSMContext):
-    order_id = callback.data.replace("pay_card_", "")
-    order = await get_order(order_id)
-    if not order:
-        await callback.answer("❌ Buyurtma topilmadi!", show_alert=True)
-        return
-        
-    text = (
-        f"💳 <b>Karta orqali to'lov</b>\n\n"
-        f"Xizmat: <b>{order['service_type'].capitalize()} ({order['pages']})</b>\n"
-        f"To'lov miqdori: <b>{order['amount']:,} so'm</b>\n\n"
-        f"Quyidagi karta raqamiga to'lovni amalga oshiring:\n"
-        f"<code>{CLICK_CARD_NUMBER}</code>\n\n"
-        f"To'lovni amalga oshirgandan so'ng, <b>\"To'ladim\"</b> tugmasini bosing."
-    )
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_confirm_kb(order_id))
-    await callback.answer()
 
 @router.callback_query(F.data.startswith("paid_"))
 async def payment_sent_handler(callback: CallbackQuery, state: FSMContext):
