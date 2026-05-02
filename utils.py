@@ -8,7 +8,9 @@ import time
 import re
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt
+from docx.shared import Pt, Cm
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from pptx import Presentation
 from pptx.util import Inches, Pt as PptxPt
 
@@ -170,6 +172,143 @@ def create_docx(text: str, filename: str, university: str, author: str, topic: s
         empty_p = doc.add_paragraph("")
         empty_p.paragraph_format.line_spacing = 1.5
             
+    file_path = os.path.abspath(os.path.join(exports_dir, filename))
+    doc.save(file_path)
+    return file_path
+
+def add_toc(doc):
+    paragraph = doc.add_paragraph()
+    run = paragraph.add_run()
+    fldChar = OxmlElement('w:fldChar')
+    fldChar.set(qn('w:fldCharType'), 'begin')
+    instrText = OxmlElement('w:instrText')
+    instrText.set(qn('xml:space'), 'preserve')
+    instrText.text = 'TOC \\o "1-3" \\h \\z \\u'
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'separate')
+    fldChar3 = OxmlElement('w:fldChar')
+    fldChar3.set(qn('w:fldCharType'), 'end')
+    r = run._r
+    r.append(fldChar)
+    r.append(instrText)
+    r.append(fldChar2)
+    r.append(fldChar3)
+
+def create_mustaqil_ish_docx(text: str, filename: str, topic: str, subject: str, university: str, teacher: str, author: str) -> str:
+    exports_dir = "exports"
+    if not os.path.exists(exports_dir):
+        os.makedirs(exports_dir)
+    cleanup_old_files()
+    
+    doc = Document()
+    
+    # 1. Formatting
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Times New Roman'
+    font.size = Pt(14)
+    style.paragraph_format.line_spacing = 1.5
+    style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    
+    for h in ['Heading 1', 'Heading 2']:
+        hs = doc.styles[h]
+        hs.font.name = 'Times New Roman'
+        hs.font.size = Pt(14)
+        hs.font.bold = True
+        hs.font.color.rgb = None # Black
+        hs.paragraph_format.line_spacing = 1.5
+        hs.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(2)
+        section.right_margin = Cm(2)
+    
+    # 2. Cover Page
+    uni_lines = university.split(',')
+    uni_name = uni_lines[0].strip().upper() if uni_lines else "OLIY TA'LIM MUASSASASI"
+    city_name = uni_lines[1].strip() if len(uni_lines) > 1 else "Toshkent"
+    
+    p_gov = doc.add_paragraph()
+    p_gov.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_gov = p_gov.add_run("O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM FAN VA INNOVATSIYA VAZIRLIGI\n" + uni_name)
+    run_gov.bold = True
+    run_gov.font.size = Pt(14)
+    
+    for _ in range(5): doc.add_paragraph("")
+    
+    p_fac = doc.add_paragraph()
+    p_fac.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_fac.add_run(f"\"{subject.upper()}\" fanidan").bold = True
+    
+    p_type = doc.add_paragraph()
+    p_type.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_type = p_type.add_run("MUSTAQIL ISH")
+    r_type.bold = True
+    r_type.font.size = Pt(24)
+    
+    doc.add_paragraph("")
+    
+    p_top = doc.add_paragraph()
+    p_top.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_top.add_run(f"Mavzu: {topic.upper()}").bold = True
+    
+    for _ in range(5): doc.add_paragraph("")
+    
+    # Signatures
+    p_sign = doc.add_paragraph()
+    p_sign.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_sign.add_run(f"Bajardi: {author}\nTekshirdi: {teacher}")
+    
+    for _ in range(5): doc.add_paragraph("")
+    
+    # Bottom Year
+    p_year = doc.add_paragraph()
+    p_year.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    import datetime
+    year = datetime.datetime.now().year
+    p_year.add_run(f"{city_name} - {year}")
+    
+    doc.add_page_break()
+    
+    # 3. TOC
+    p_toc = doc.add_paragraph()
+    p_toc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_toc.add_run("MUNDARIJA").bold = True
+    add_toc(doc)
+    doc.add_page_break()
+    
+    # 4. Content
+    # We parse the text. Skip REJA part since we use Word TOC.
+    parts = text.split("KIRISH:")
+    if len(parts) > 1:
+        # Strip out anything before KIRISH
+        content = "KIRISH:\n" + parts[1].strip()
+    else:
+        content = text
+        
+    paragraphs = content.split('\n')
+    for line in paragraphs:
+        if not line.strip():
+            continue
+            
+        line_clean = clean_markdown(line)
+        
+        # Determine if heading
+        is_heading = False
+        if line_clean.startswith("KIRISH") or line_clean.startswith("XULOSA") or line_clean.startswith("ASOSIY QISM") or line_clean.startswith("FOYDALANILGAN ADABIYOTLAR"):
+            p = doc.add_paragraph(line_clean, style='Heading 1')
+            is_heading = True
+        elif re.match(r'^\d+\.\d+\.', line_clean) or re.match(r'^\d+\.', line_clean):
+            p = doc.add_paragraph(line_clean, style='Heading 2')
+            is_heading = True
+        else:
+            p = doc.add_paragraph()
+            run = p.add_run(line_clean)
+            if line.isupper() and len(line) > 5:
+                run.bold = True
+                
     file_path = os.path.abspath(os.path.join(exports_dir, filename))
     doc.save(file_path)
     return file_path

@@ -3,7 +3,7 @@ import json
 from aiogram import Bot
 from aiogram.types import FSInputFile
 from services.ai_service import generate_article, generate_assignment, generate_report, generate_presentation_text
-from utils import create_docx, create_pptx
+from utils import create_docx, create_pptx, create_mustaqil_ish_docx
 
 async def fulfill_order(bot: Bot, order: dict):
     """
@@ -31,8 +31,10 @@ async def fulfill_order(bot: Bot, order: dict):
             await bot.send_document(user_id, FSInputFile(file_path), caption="Maqola tayyor!")
             
         elif service_type == "mustaqil":
+            subject = params.get("subject", "Nomsiz fan")
+            teacher = params.get("teacher", "O'qituvchi")
             text = await generate_assignment(topic, tier, "O'rta")
-            file_path = create_docx(text, f"Mustaqil_ish_{user_id}.docx", university, author, topic, "MUSTAQIL ISH")
+            file_path = create_mustaqil_ish_docx(text, f"Mustaqil_ish_{user_id}.docx", topic, subject, university, teacher, author)
             await bot.send_document(user_id, FSInputFile(file_path), caption="Mustaqil ish tayyor!")
             
         elif service_type == "referat":

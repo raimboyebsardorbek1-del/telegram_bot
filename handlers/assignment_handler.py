@@ -14,7 +14,9 @@ router = Router()
 
 class AssignmentState(StatesGroup):
     waiting_for_topic = State()
+    waiting_for_subject = State()
     waiting_for_university = State()
+    waiting_for_teacher = State()
     waiting_for_author = State()
     waiting_for_tier = State()
 
@@ -22,7 +24,7 @@ class AssignmentState(StatesGroup):
 async def start_assignment_flow(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AssignmentState.waiting_for_topic)
     await callback.message.edit_text(
-        "📝 Mustaqil ish bo'limi.\n\nQaysi fan/mavzuda mustaqil ish kerak? Kiriting:",
+        "📝 Mustaqil ish bo'limi.\n\nQaysi mavzuda mustaqil ish kerak? Kiriting:",
         reply_markup=cancel_kb()
     )
     await callback.answer()
@@ -30,14 +32,26 @@ async def start_assignment_flow(callback: CallbackQuery, state: FSMContext):
 @router.message(AssignmentState.waiting_for_topic)
 async def process_topic(message: Message, state: FSMContext):
     await state.update_data(topic=message.text)
+    await state.set_state(AssignmentState.waiting_for_subject)
+    await message.answer("Qaysi fan uchun tayyorlanmoqda? Fan nomini kiriting:", reply_markup=cancel_kb())
+
+@router.message(AssignmentState.waiting_for_subject)
+async def process_subject(message: Message, state: FSMContext):
+    await state.update_data(subject=message.text)
     await state.set_state(AssignmentState.waiting_for_university)
-    await message.answer("Oliygohingiz nomini kiriting:", reply_markup=cancel_kb())
+    await message.answer("Muassasa va joylashgan shaharni kiriting (Masalan: Urganch davlat universiteti, Urganch):", reply_markup=cancel_kb())
 
 @router.message(AssignmentState.waiting_for_university)
 async def process_university(message: Message, state: FSMContext):
     await state.update_data(university=message.text)
+    await state.set_state(AssignmentState.waiting_for_teacher)
+    await message.answer("O'qituvchining ism-familiyasini kiriting:", reply_markup=cancel_kb())
+
+@router.message(AssignmentState.waiting_for_teacher)
+async def process_teacher(message: Message, state: FSMContext):
+    await state.update_data(teacher=message.text)
     await state.set_state(AssignmentState.waiting_for_author)
-    await message.answer("Muallif ism-familiyasini kiriting:", reply_markup=cancel_kb())
+    await message.answer("Talaba (Bajardi) ism-familiyasini kiriting:", reply_markup=cancel_kb())
 
 @router.message(AssignmentState.waiting_for_author)
 async def process_author(message: Message, state: FSMContext):
@@ -72,7 +86,13 @@ async def process_tier(callback: CallbackQuery, state: FSMContext):
     else:
         import json
         order_id = f"ORDER_{uuid.uuid4().hex[:8].upper()}"
-        params = json.dumps({"topic": data["topic"], "university": data["university"], "author": data["author"]})
+        params = json.dumps({
+            "topic": data["topic"], 
+            "subject": data.get("subject", "Nomsiz fan"),
+            "university": data["university"], 
+            "teacher": data.get("teacher", "O'qituvchi"),
+            "author": data["author"]
+        })
         await create_order(order_id, user_id, "mustaqil", tier, amount, params)
         click_url = generate_click_url(order_id, amount)
         
@@ -87,16 +107,33 @@ async def process_tier(callback: CallbackQuery, state: FSMContext):
 
 async def generate_and_send_assignment(message: Message, data: dict, tier: str, user_id: int):
     topic = data.get("topic")
+    subject = data.get("subject", "Nomsiz fan")
     university = data.get("university")
+    teacher = data.get("teacher", "O'qituvchi")
     author = data.get("author")
     
     try:
-        content = await generate_assignment(topic, tier, "O'rta")
-        file_path = create_docx(content, f"Mustaqil_ish_{user_id}.docx", university, author, topic, "MUSTAQIL ISH")
-        await message.answer_document(
-            FSInputFile(file_path),
-            caption=f"✅ '{topic}' mavzusidagi mustaqil ish tayyor!"
-        )
+        # Since this is a free usage generation, we call our new generation flow
+        from services.generation_service import fulfill_order
+        # Mock order dict
+        import json
+        params = json.dumps({
+            "topic": topic, 
+            "subject": subject,
+            "university": university, 
+            "teacher": teacher,
+            "author": author
+        })
+        mock_order = {
+            "order_id": "FREE_USAGE",
+            "user_id": user_id,
+            "service_type": "mustaqil",
+            "pages": tier,
+            "parameters": params
+        }
+        await fulfill_order(message.bot, mock_order)
+        # We don't need to send the file directly here anymore because fulfill_order does it
+        # BUT fulfill_order sends to user_id. We can just wait for it.
     except Exception as e:
         await message.answer(f"❌ Xatolik: {e}")
     

@@ -40,11 +40,19 @@ async def generate_assignment(subject: str, pages: str, difficulty: str) -> str:
     word_target = num_pages * 300
 
     prompt = (
-        f"Create an independent work assignment (mustaqil ish) about the subject '{subject}' "
-        f"with '{difficulty}' difficulty level. The content MUST be at least {word_target} words long to fill exactly {num_pages} pages. "
-        f"Structure MUST start with a section titled 'REJA:' which lists the main points in a numbered list (1., 2., 3., etc.). "
-        f"Following the REJA section, provide the complete solution/content. "
-        f"The entire response must be in Uzbek."
+        f"Siz O'zbekistondagi oliygoh talabasi uchun '{subject}' fanidan '{topic}' mavzusida Mustaqil ish yozishingiz kerak.\n"
+        f"Umumiy hajm kamida {word_target} ta so'zdan iborat bo'lishi va {num_pages} betni qoplashi shart.\n\n"
+        f"QAT'IY TUZILMA (Shu ketma-ketlikda yozing):\n"
+        f"REJA:\n1. Kirish\n2. Asosiy qism\n2.1. Nazariy qism\n2.2. Tahliliy qism\n2.3. Amaliy qism\n3. Xulosa\n4. Foydalanilgan adabiyotlar ro'yxati\n\n"
+        f"Yuqoridagi reja qismidan so'ng, matnni boshlang:\n"
+        f"KIRISH: Mavzuning dolzarbligi, maqsad, vazifalar, o'rganilgan manbalarni yoritib bering.\n"
+        f"ASOSIY QISM:\n"
+        f"2.1. Nazariy qism: Tushunchalar va qoidalar.\n"
+        f"2.2. Tahliliy qism: Muammoni tahlil qilish va tushuntirish.\n"
+        f"2.3. Amaliy qism: Real misollar, yechimlar yoki natijalar.\n"
+        f"XULOSA: Umumiy xulosa va yakuniy takliflar.\n"
+        f"FOYDALANILGAN ADABIYOTLAR: Kamida 5 ta manba, alifbo tartibida (GOST standartiga mos qilib, o'zbek tilida).\n\n"
+        f"Barcha matn faqat O'zbek tilida bo'lishi kerak. Gaplar takrorlanmasin, ilmiy-akademik uslubda yozing. Matn sarlavhalarini aynan yuqoridagidek qilib yozing."
     )
     try:
         response = await model.generate_content_async(prompt)
