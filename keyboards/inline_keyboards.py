@@ -33,8 +33,7 @@ def price_selection_kb(service_type: str) -> InlineKeyboardMarkup:
 def payment_method_kb(order_id: str, click_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Avtomatik (Click)", url=click_url)],
-            [InlineKeyboardButton(text="💳 Karta orqali to'lov", callback_data=f"pay_card_{order_id}")],
+            [InlineKeyboardButton(text="💳 Karta orqali to'lov (Screenshot yuborish)", callback_data=f"pay_card_{order_id}")],
             [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")]
         ]
     )
