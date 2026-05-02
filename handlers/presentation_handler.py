@@ -2,10 +2,9 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from keyboards.inline_keyboards import main_menu_kb, price_selection_kb, cancel_kb, payment_method_kb
+from keyboards.inline_keyboards import main_menu_kb, price_selection_kb, cancel_kb
 from database import check_free_usage, mark_free_usage, create_order
 from services.ai_service import generate_presentation_text
-from services.click_service import generate_click_url
 from utils import create_pptx
 from config import PRICES, CLICK_CARD_NUMBER
 from keyboards.inline_keyboards import payment_confirm_kb
