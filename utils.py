@@ -11,6 +11,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, Cm
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from lxml import etree
 from pptx import Presentation
 from pptx.util import Inches, Pt as PptxPt
 
@@ -43,6 +44,162 @@ def clean_markdown(text: str) -> str:
     # Remove horizontal lines represented by dashes
     text = re.sub(r'-{3,}', '', text)
     return text.strip()
+
+
+# ── OMML FORMULA SUPPORT ────────────────────────────────────────────────────
+
+OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
+
+def _omml(xml: str) -> etree._Element:
+    """Parse an OMML XML string and return the lxml element."""
+    return etree.fromstring(xml)
+
+def _chem_sub(symbol: str, sub: str) -> str:
+    """Build OMML for a chemical formula like CO2 (symbol + subscript)."""
+    return (
+        f'<m:oMath xmlns:m="{OMML_NS}">'
+        f'<m:sSub><m:sSubPr><m:ctrlPr/></m:sSubPr>'
+        f'<m:e><m:r><m:t>{symbol}</m:t></m:r></m:e>'
+        f'<m:sub><m:r><m:t>{sub}</m:t></m:r></m:sub>'
+        f'</m:sSub></m:oMath>'
+    )
+
+def _chem_h2o() -> str:
+    """OMML for H2O."""
+    return (
+        f'<m:oMath xmlns:m="{OMML_NS}">'
+        f'<m:sSub><m:sSubPr><m:ctrlPr/></m:sSubPr>'
+        f'<m:e><m:r><m:t>H</m:t></m:r></m:e>'
+        f'<m:sub><m:r><m:t>2</m:t></m:r></m:sub>'
+        f'</m:sSub>'
+        f'<m:r><m:t>O</m:t></m:r>'
+        f'</m:oMath>'
+    )
+
+def _sup(base: str, exp: str) -> str:
+    """OMML for base^exp (e.g. m², km²)."""
+    return (
+        f'<m:oMath xmlns:m="{OMML_NS}">'
+        f'<m:r><m:t>{base}</m:t></m:r>'
+        f'<m:sSup><m:sSupPr><m:ctrlPr/></m:sSupPr>'
+        f'<m:e><m:r><m:t></m:t></m:r></m:e>'
+        f'<m:sup><m:r><m:t>{exp}</m:t></m:r></m:sup>'
+        f'</m:sSup>'
+        f'</m:oMath>'
+    )
+
+def _temperature(val: str) -> str:
+    """OMML for temperature value like +15°C or -18°C."""
+    return (
+        f'<m:oMath xmlns:m="{OMML_NS}">'
+        f'<m:r><m:t>{val}</m:t></m:r>'
+        f'</m:oMath>'
+    )
+
+def _fraction(num: str, den: str) -> str:
+    """OMML for a/b fraction."""
+    return (
+        f'<m:oMath xmlns:m="{OMML_NS}">'
+        f'<m:f><m:fPr><m:ctrlPr/></m:fPr>'
+        f'<m:num><m:r><m:t>{num}</m:t></m:r></m:num>'
+        f'<m:den><m:r><m:t>{den}</m:t></m:r></m:den>'
+        f'</m:f></m:oMath>'
+    )
+
+# Regex pattern: matches tokens that should become formulas
+# Order matters — more specific patterns first
+_FORMULA_PATTERN = re.compile(
+    r'([+-]?\d+(?:[.,]\d+)?\s*°[CF])'        # temperature: -18°C, +15°C
+    r'|(H2O)'                                   # H2O special case
+    r'|(CO2|SO2|SO3|NO2|NOx|NH3|CH4|N2O)'     # common gases with sub-2
+    r'|([A-Z][a-z]?)([2-9])'                   # generic chem: X2, X3 …
+    r'|(\d+(?:[.,]\d+)?)\s*/\s*(\d+(?:[.,]\d+)?)' # fraction: 3/4
+    r'|(\w+(?:\s*\w+)?)([²³])'                # superscript: m², km³
+    r'|(\d+(?:[.,]\d+)?)\s*([²³])'            # pure superscript: 10²
+)
+
+_SUP_MAP = {'²': '2', '³': '3'}
+
+
+def add_formula_paragraph(doc, text: str, style: str = 'Normal', bold: bool = False):
+    """
+    Adds a paragraph to *doc* where formula tokens inside *text* are
+    rendered as OMML Word equations, while plain text is added as runs.
+
+    Returns the paragraph.
+    """
+    p = doc.add_paragraph(style=style)
+    _fill_paragraph_with_formulas(p, text, bold=bold)
+    return p
+
+
+def _fill_paragraph_with_formulas(paragraph, text: str, bold: bool = False):
+    """
+    Scans *text* for formula tokens.  Plain text segments are appended
+    as normal runs; formula tokens are appended as OMML elements.
+    """
+    last_end = 0
+    for m in _FORMULA_PATTERN.finditer(text):
+        start, end = m.start(), m.end()
+
+        # plain text before this match
+        if start > last_end:
+            _add_plain_run(paragraph, text[last_end:start], bold)
+
+        omml_xml = _match_to_omml(m)
+        if omml_xml:
+            try:
+                paragraph._p.append(_omml(omml_xml))
+            except Exception:
+                # fallback: just write plain text
+                _add_plain_run(paragraph, m.group(0), bold)
+        else:
+            _add_plain_run(paragraph, m.group(0), bold)
+
+        last_end = end
+
+    # remaining plain text
+    if last_end < len(text):
+        _add_plain_run(paragraph, text[last_end:], bold)
+
+
+def _add_plain_run(paragraph, text: str, bold: bool = False):
+    if text:
+        run = paragraph.add_run(text)
+        run.bold = bold
+
+
+def _match_to_omml(m: re.Match) -> str | None:
+    """Convert a regex match to the appropriate OMML XML string."""
+    g = m.groups()
+    # g[0] temperature
+    if g[0]:
+        return _temperature(g[0].strip())
+    # g[1] H2O
+    if g[1]:
+        return _chem_h2o()
+    # g[2] common gases CO2 etc.
+    if g[2]:
+        sym = g[2][:-1]  # everything except the last char (digit)
+        dig = g[2][-1]
+        return _chem_sub(sym, dig)
+    # g[3] g[4] generic chem X2
+    if g[3] and g[4]:
+        return _chem_sub(g[3], g[4])
+    # g[5] g[6] fraction
+    if g[5] and g[6]:
+        return _fraction(g[5], g[6])
+    # g[7] g[8] word+superscript char e.g. km²
+    if g[7] is not None and g[8]:
+        exp = _SUP_MAP.get(g[8], g[8])
+        return _sup(g[7], exp)
+    # g[9] g[10] number+superscript
+    if g[9] is not None and g[10]:
+        exp = _SUP_MAP.get(g[10], g[10])
+        return _sup(g[9], exp)
+    return None
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 def cleanup_old_files():
     """Deletes files older than 24 hours from the exports directory."""
@@ -236,17 +393,13 @@ def create_academic_docx(text: str, filename: str, topic: str, subject: str, doc
                 doc.add_page_break()
             else:
                 first_heading = False
-                
-            p = doc.add_paragraph(line_clean, style='Heading 1')
+
+            p = add_formula_paragraph(doc, line_clean, style='Heading 1', bold=True)
         elif is_h2:
-            p = doc.add_paragraph(line_clean, style='Heading 2')
+            p = add_formula_paragraph(doc, line_clean, style='Heading 2', bold=True)
         else:
-            p = doc.add_paragraph()
-            if line_clean.isupper() and len(line_clean) > 5 and len(line_clean) < 100:
-                run = p.add_run(line_clean)
-                run.bold = True
-            else:
-                p.add_run(line_clean)
+            is_bold_line = line_clean.isupper() and 5 < len(line_clean) < 100
+            p = add_formula_paragraph(doc, line_clean, style='Normal', bold=is_bold_line)
                 
     file_path = os.path.abspath(os.path.join(exports_dir, filename))
     doc.save(file_path)
