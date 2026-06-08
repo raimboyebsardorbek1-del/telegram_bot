@@ -27,28 +27,29 @@ CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY")
 CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID")
 CLICK_CARD_NUMBER = os.getenv("CLICK_CARD_NUMBER", "8600123456789012") # Placeholder, should be in .env
 
-# Pricing (UZS)
 PRICES = {
-    "maqola": {
-        "3-10": 4000,
-        "10-15": 6000,
-        "15-20": 8000
-    },
     "mustaqil": {
         "10-15": 3000,
         "15-20": 4000,
-        "20-25": 5000
+        "20-25": 5000,
+        "25-30": 6000
     },
     "referat": {
-        "10-15": 3000,
+        "5-10": 3000,
         "15-20": 4000,
-        "20-25": 5000
+        "20-25": 5000,
+        "25-30": 6000
     },
     "taqdimot": {
-        "6-19": 3000,
-        "20-30": 5000,
-        "premium_6_19": 6000,
-        "premium_20_30": 8000
+        "10": 20000,
+        "15": 30000
+    },
+    "esse": {
+        "3-5": 10000
+    },
+    "kurs": {
+        "20-30": 50000,
+        "31-50": 80000
     }
 }
 

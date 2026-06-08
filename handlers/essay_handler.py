@@ -8,42 +8,42 @@ from config import PRICES
 
 router = Router()
 
-class ReportState(StatesGroup):
+class EssayState(StatesGroup):
     waiting_for_topic = State()
     waiting_for_subject = State()
     waiting_for_tier = State()
 
-@router.callback_query(F.data == "menu_report")
-async def start_report_flow(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(ReportState.waiting_for_topic)
+@router.callback_query(F.data == "menu_essay")
+async def start_essay_flow(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(EssayState.waiting_for_topic)
     await callback.message.edit_text(
-        "📄 <b>Referat yozish bo'limi</b>\n\nReferat mavzusini kiriting:",
+        "✍️ <b>Esse yozish bo'limi</b>\n\nEsse mavzusini kiriting:",
         parse_mode="HTML",
         reply_markup=cancel_kb()
     )
     await callback.answer()
 
-@router.message(ReportState.waiting_for_topic)
+@router.message(EssayState.waiting_for_topic)
 async def process_topic(message: Message, state: FSMContext):
     await state.update_data(topic=message.text)
-    await state.set_state(ReportState.waiting_for_subject)
+    await state.set_state(EssayState.waiting_for_subject)
     await message.answer(
         "Qaysi fan uchun tayyorlanmoqda? Fan nomini kiriting:",
         reply_markup=cancel_kb()
     )
 
-@router.message(ReportState.waiting_for_subject)
+@router.message(EssayState.waiting_for_subject)
 async def process_subject(message: Message, state: FSMContext):
     await state.update_data(subject=message.text)
-    await state.set_state(ReportState.waiting_for_tier)
+    await state.set_state(EssayState.waiting_for_tier)
     await message.answer(
-        "Referat necha bet bo'lishini tanlang yoki yozing (Masalan: 10):",
-        reply_markup=price_selection_kb("referat")
+        "Esse necha bet bo'lishini tanlang yoki yozing (Masalan: 4):",
+        reply_markup=price_selection_kb("esse")
     )
 
-async def finish_report_order(event, state: FSMContext, tier: str, bot, user_id: int):
+async def finish_essay_order(event, state: FSMContext, tier: str, bot, user_id: int):
     data = await state.get_data()
-    amount = PRICES["referat"][tier]
+    amount = PRICES["esse"][tier]
     
     params_dict = {
         "topic": data["topic"],
@@ -52,15 +52,15 @@ async def finish_report_order(event, state: FSMContext, tier: str, bot, user_id:
     }
     
     await state.clear()
-    await handle_order_payment(bot, user_id, "referat", tier, amount, params_dict, event)
+    await handle_order_payment(bot, user_id, "esse", tier, amount, params_dict, event)
 
-@router.callback_query(ReportState.waiting_for_tier, F.data.startswith("price_referat_"))
+@router.callback_query(EssayState.waiting_for_tier, F.data.startswith("price_esse_"))
 async def process_tier_callback(callback: CallbackQuery, state: FSMContext):
     tier = callback.data.split("_")[-1]
-    await finish_report_order(callback.message, state, tier, callback.message.bot, callback.from_user.id)
+    await finish_essay_order(callback.message, state, tier, callback.message.bot, callback.from_user.id)
     await callback.answer()
 
-@router.message(ReportState.waiting_for_tier)
+@router.message(EssayState.waiting_for_tier)
 async def process_tier_text(message: Message, state: FSMContext):
-    tier = parse_pages_input("referat", message.text)
-    await finish_report_order(message, state, tier, message.bot, message.from_user.id)
+    tier = parse_pages_input("esse", message.text)
+    await finish_essay_order(message, state, tier, message.bot, message.from_user.id)

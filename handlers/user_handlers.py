@@ -1,11 +1,27 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from keyboards.inline_keyboards import main_menu_kb, cancel_kb, payment_confirm_kb, admin_order_approval_kb
-from database import add_user, get_balance, get_order
+from keyboards.inline_keyboards import (
+    main_menu_kb,
+    cancel_kb,
+    payment_confirm_kb,
+    admin_order_approval_kb,
+    pay_balance_kb
+)
+from database import (
+    add_user,
+    get_balance,
+    get_order,
+    get_all_users,
+    add_referral,
+    update_balance,
+    get_referral_stats,
+    update_order_status
+)
 from config import CLICK_CARD_NUMBER, ADMIN_ID
+from services.generation_service import fulfill_order
 import logging
 
 router = Router()
@@ -13,32 +29,80 @@ router = Router()
 class PaymentState(StatesGroup):
     waiting_for_proof = State()
 
+async def get_referral_text_and_kb(user_id: int, bot_username: str):
+    stats = await get_referral_stats(user_id)
+    bot_link = f"https://t.me/{bot_username}?start={user_id}"
+    text = (
+        "👥 <b>Do'stlarni taklif qilish tizimi</b>\n\n"
+        f"Sizning taklif havolangiz:\n<code>{bot_link}</code>\n\n"
+        f"Taklifingiz orqali ro'yxatdan o'tganlar: <b>{stats['total_referred']} ta</b>\n"
+        f"Buyurtma berganlar: <b>{stats['ordered_referred']} ta</b>\n"
+        f"Jami ishlangan bonus: <b>{stats['total_bonus']:,} so'm</b>\n\n"
+        "<i>Har bir taklif qilingan do'stingiz ro'yxatdan o'tganda sizga 3,000 so'm bonus berildi. "
+        "Do'stingiz birinchi buyurtmasini berganda, ham sizga, ham do'stingizga yana 3,000 so'mdan bonus beriladi!</i>"
+    )
+    return text
+
+async def get_balance_text(user_id: int) -> str:
+    balance = await get_balance(user_id)
+    text = (
+        f"💰 <b>Sizning balansingiz</b>\n\n"
+        f"Hisobingizda: <b>{balance:,} so'm</b>\n\n"
+        f"Ushbu mablag'ni bot orqali buyurtmalarni to'lashga ishlatishingiz mumkin.\n"
+        f"Balansni ko'paytirish uchun do'stlaringizni taklif qiling!"
+    )
+    return text
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     
-    # Extract referral code if exists (start parameter)
     args = message.text.split()
     referrer_id = args[1] if len(args) > 1 else None
     
+    user_id = message.from_user.id
+    all_users = await get_all_users()
+    is_new = user_id not in all_users
+    
     await add_user(
-        user_id=message.from_user.id,
+        user_id=user_id,
         name=message.from_user.first_name,
         username=message.from_user.username
     )
     
-    # Log referral if needed (optional)
-    if referrer_id:
-        logging.info(f"User {message.from_user.id} joined via referral {referrer_id}")
+    if is_new and referrer_id and referrer_id.isdigit():
+        ref_id_int = int(referrer_id)
+        if ref_id_int != user_id and ref_id_int in all_users:
+            await add_referral(ref_id_int, user_id)
+            await update_balance(ref_id_int, 3000.0)
+            logging.info(f"User {user_id} joined via referral {ref_id_int}. Referrer rewarded with 3000 UZS.")
+            try:
+                await message.bot.send_message(
+                    ref_id_int,
+                    f"🎉 Siz taklif qilgan do'stingiz ({message.from_user.first_name}) ro'yxatdan o'tdi!\n"
+                    f"Sizga 3,000 so'm bonus berildi."
+                )
+            except Exception as e:
+                logging.error(f"Failed to send referral notification to {ref_id_int}: {e}")
 
     text = (
         f"Assalomu alaykum, {message.from_user.first_name}! 👋\n\n"
         f"Men sizning shaxsiy AI yordamchingizman. "
-        f"Hujjatlar yozish, mustaqil ishlar va taqdimotlar tayyorlashda yordam beraman.\n\n"
-        f"🎁 <b>Har bir xizmatdan 1 marta bepul foydalanishingiz mumkin!</b>\n\n"
+        f"Hujjatlar yozish, referat, esse, kurs ishlari va taqdimotlar tayyorlashda yordam beraman.\n\n"
         f"Quyidagi menudan kerakli bo'limni tanlang:"
     )
     await message.answer(text, reply_markup=main_menu_kb(), parse_mode="HTML")
+
+@router.message(Command("referral"))
+async def cmd_referral(message: Message):
+    bot_info = await message.bot.get_me()
+    text = await get_referral_text_and_kb(message.from_user.id, bot_info.username)
+    await message.answer(text, parse_mode="HTML", reply_markup=main_menu_kb())
+
+@router.message(Command("balance"))
+async def cmd_balance(message: Message):
+    text = await get_balance_text(message.from_user.id)
+    await message.answer(text, parse_mode="HTML", reply_markup=main_menu_kb())
 
 @router.callback_query(F.data == "cancel")
 async def cancel_action(callback: CallbackQuery, state: FSMContext):
@@ -51,27 +115,14 @@ async def cancel_action(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "menu_balance")
 async def balance_handler(callback: CallbackQuery):
-    balance = await get_balance(callback.from_user.id)
-    text = (
-        f"💰 <b>Sizning balansingiz</b>\n\n"
-        f"Hisobingizda: <b>{balance:,} so'm</b>\n\n"
-        f"Taklif: Do'stlaringizni taklif qiling va bepul foydalanish imkoniyatini oshiring!"
-    )
+    text = await get_balance_text(callback.from_user.id)
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu_kb())
     await callback.answer()
 
 @router.callback_query(F.data == "menu_invite")
 async def invite_handler(callback: CallbackQuery):
-    user_id = callback.from_user.id
     bot_info = await callback.message.bot.get_me()
-    bot_link = f"https://t.me/{bot_info.username}?start={user_id}"
-    
-    text = (
-        "👥 <b>Do'stlarni taklif qiling!</b>\n\n"
-        "Botimizni do'stlaringizga tavsiya qiling:\n\n"
-        f"<code>{bot_link}</code>\n\n"
-        "Ushbu havolani nusxalab, do'stlaringizga yuboring! ✨"
-    )
+    text = await get_referral_text_and_kb(callback.from_user.id, bot_info.username)
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu_kb())
     await callback.answer()
 
@@ -87,7 +138,52 @@ async def contact_handler(callback: CallbackQuery):
     )
     await callback.answer()
 
+@router.callback_query(F.data.startswith("pay_balance_"))
+async def pay_balance_handler(callback: CallbackQuery):
+    order_id = callback.data.replace("pay_balance_", "")
+    user_id = callback.from_user.id
+    
+    order = await get_order(order_id)
+    if not order:
+        await callback.answer("❌ Buyurtma topilmadi!", show_alert=True)
+        return
+        
+    if order['status'] == 'paid':
+        await callback.answer("✅ Bu buyurtma allaqachon to'langan!", show_alert=True)
+        return
+        
+    balance = await get_balance(user_id)
+    if balance >= order['amount']:
+        await update_balance(user_id, -order['amount'])
+        await update_order_status(order_id, 'paid')
+        order['status'] = 'paid'
+        await callback.message.edit_text("💰 To'lov balansingizdan muvaffaqiyatli yechib olindi! Hujjat tayyorlanmoqda...")
+        await callback.answer("To'lov muvaffaqiyatli bajarildi!")
+        # Trigger fulfillment asynchronously
+        await fulfill_order(callback.message.bot, order)
+    else:
+        await callback.answer("❌ Balansingizda yetarli mablag' mavjud emas!", show_alert=True)
 
+@router.callback_query(F.data.startswith("pay_card_"))
+async def pay_card_handler(callback: CallbackQuery):
+    order_id = callback.data.replace("pay_card_", "")
+    order = await get_order(order_id)
+    if not order:
+        await callback.answer("❌ Buyurtma topilmadi!", show_alert=True)
+        return
+        
+    text = (
+        f"💳 <b>To'lov tafsilotlari</b>\n\n"
+        f"Buyurtma ID: <code>{order_id}</code>\n"
+        f"Xizmat turi: <b>{order['service_type']}</b>\n"
+        f"Hajmi: <b>{order['pages']}</b>\n"
+        f"To'lov miqdori: <b>{order['amount']:,} so'm</b>\n\n"
+        f"To'lovni amalga oshirish uchun quyidagi Click kartaga pul o'tkazing:\n"
+        f"<code>{CLICK_CARD_NUMBER}</code>\n\n"
+        f"To'lovni amalga oshirgandan so'ng, pastdagi \"✅ To'ladim\" tugmasini bosing va chek rasmini yuboring."
+    )
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_confirm_kb(order_id))
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("paid_"))
 async def payment_sent_handler(callback: CallbackQuery, state: FSMContext):
@@ -128,7 +224,6 @@ async def receive_payment_proof(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    # Send to admin
     username_str = f"@{user.username}" if user.username else "Username yo'q"
     caption = (
         f"🔔 <b>Yangi to'lov cheki keldi! (Qo'lda to'lov)</b>\n\n"

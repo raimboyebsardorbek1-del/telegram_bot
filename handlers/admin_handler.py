@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from keyboards.inline_keyboards import admin_panel_kb, cancel_kb
 from config import ADMIN_PASSWORD
-from database import get_stats, ban_user, unban_user, get_all_users_details
+from database import get_stats, ban_user, unban_user, get_all_users_details, get_detailed_admin_stats
 from services.broadcast_service import broadcast_message
 
 router = Router()
@@ -45,11 +45,28 @@ async def show_stats(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Ruxsatsiz kirish!", show_alert=True)
         return
 
-    stats = await get_stats()
+    stats = await get_detailed_admin_stats()
+    
+    active_users_str = ""
+    for idx, user in enumerate(stats['active_users'], 1):
+        uid, name, username, count = user
+        username_str = f"@{username}" if username else "yo'q"
+        active_users_str += f"{idx}. {name} (ID: {uid}, {username_str}) - {count} ta buyurtma\n"
+        
+    if not active_users_str:
+        active_users_str = "Hozircha faol foydalanuvchilar yo'q."
+        
     text = (
-        "📊 <b>Bot Statistikasi</b>\n\n"
-        f"👥 Umumiy foydalanuvchilar: <b>{stats['users']}</b>\n"
-        f"💰 Muvaffaqiyatli to'lovlar: <b>{stats.get('paid_orders', 0)}</b>"
+        "📊 <b>Kengaytirilgan Bot Statistikasi</b>\n\n"
+        f"👥 Umumiy foydalanuvchilar: <b>{stats['total_users']} ta</b>\n"
+        f"📦 Buyurtmalar jami: <b>{stats['total_orders']} ta</b>\n"
+        f"✅ To'langan buyurtmalar: <b>{stats['paid_orders']} ta</b>\n\n"
+        f"💸 Bugungi tushum: <b>{stats['daily_revenue']:,} so'm</b>\n"
+        f"📅 Shu oydagi tushum: <b>{stats['monthly_revenue']:,} so'm</b>\n"
+        f"💰 Umumiy tushum: <b>{stats['total_revenue']:,} so'm</b>\n\n"
+        f"👥 Taklif qilingan do'stlar (Referallar): <b>{stats['total_referrals']} ta</b>\n"
+        f"🎓 Referal orqali birinchi buyurtma berganlar: <b>{stats['ordered_referrals']} ta</b>\n\n"
+        f"⭐ <b>Eng faol top 5 foydalanuvchi:</b>\n{active_users_str}"
     )
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()

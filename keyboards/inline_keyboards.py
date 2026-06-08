@@ -4,14 +4,23 @@ from config import PRICES
 def main_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📚 Maqola yozish", callback_data="menu_article")],
             [InlineKeyboardButton(text="📝 Mustaqil ish", callback_data="menu_assignment")],
             [InlineKeyboardButton(text="📄 Referat", callback_data="menu_report")],
             [InlineKeyboardButton(text="📊 Taqdimot", callback_data="menu_presentation")],
-            [InlineKeyboardButton(text="🤖 AI yordamchi", callback_data="menu_ai")],
+            [InlineKeyboardButton(text="✍️ Esse", callback_data="menu_essay")],
+            [InlineKeyboardButton(text="🎓 Kurs ishi", callback_data="menu_coursework")],
             [InlineKeyboardButton(text="💰 Balansim", callback_data="menu_balance")],
             [InlineKeyboardButton(text="👥 Do‘stlarni taklif qilish", callback_data="menu_invite")],
             [InlineKeyboardButton(text="📞 Aloqa", callback_data="menu_contact")]
+        ]
+    )
+
+def pay_balance_kb(order_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="💰 Balans orqali to'lash", callback_data=f"pay_balance_{order_id}")],
+            [InlineKeyboardButton(text="💳 Plastik karta (Click) orqali", callback_data=f"pay_card_{order_id}")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")]
         ]
     )
 
